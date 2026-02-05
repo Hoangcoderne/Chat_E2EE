@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureChat E2EE</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="my-profile">
+                <h3 class="user-name">👤 <span id="my-username">...</span></h3>
+
+                <div class="profile-actions">
+                    <div class="notification-container">
+                        <button id="btn-requests" class="icon-btn">
+                            🔔 <span id="req-count" class="badge hidden">0</span>
+                        </button>
+                        
+                        <div id="requests-popup" class="requests-popup hidden">
+                            <h4>Lời mời kết bạn</h4>
+                            <ul id="requests-list">
+                                <li class="empty-msg">Không có lời mời nào</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <button id="btn-logout" class="small-btn" title="Đăng xuất">⏻</button> 
+                </div>
+            </div>
+            
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="Tìm username mới...">
+                <button id="btn-connect">Thêm</button>
+            </div>
+            
+            <div class="contacts-area">
+                <h4>Trò chuyện gần đây</h4>
+                <ul id="contacts-list" class="contacts-list">
+                    </ul>
+            </div>
+
+            <div id="status-bar" class="status">🔴 Offline</div>
+        </div>
+
+        <div class="chat-area">
+            <div id="chat-header" class="chat-header hidden">
+                <div class="header-info">
+                    <span class="partner-name" id="partner-name">...</span>
+                    <span class="partner-status" id="partner-status">Offline</span>
+                </div>
+            </div>
+
+            <div id="messages-list" class="messages-list">
+                <div class="welcome-text">
+                    Hãy nhập tên người dùng khác vào cột trái và bấm "Kết nối" để bắt đầu chat bí mật.
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <input type="text" id="msg-input" placeholder="Nhập tin nhắn bí mật..." disabled>
+                <button id="btn-send" disabled>Gửi</button>
+            </div>
+        </div>       
+    </div>
+
+    
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

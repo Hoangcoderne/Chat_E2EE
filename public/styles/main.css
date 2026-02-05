@@ -1,0 +1,158 @@
+/* public/styles/main.css */
+body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
+.app-container { display: flex; width: 100%; height: 100%; }
+
+/* Sidebar */
+.sidebar { width: 300px; background: #f7f7f7; border-right: 1px solid #ddd; padding: 20px; display: flex; flex-direction: column; }
+.my-profile { margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+.search-box { display: flex; gap: 5px; margin-bottom: 20px; }
+.search-box input { flex: 1; padding: 8px; }
+.small-btn { background: #666; font-size: 0.8em; padding: 5px 10px; }
+
+/* Chat Area */
+.chat-area { flex: 1; display: flex; flex-direction: column; background: white; }
+.chat-header { padding: 15px; background: #e3f2fd; border-bottom: 1px solid #ddd; color: #0d47a1; }
+.messages-list { flex: 1; padding: 20px; overflow-y: auto; background: #fafafa; display: flex; flex-direction: column; gap: 10px; }
+.chat-input-area { padding: 20px; border-top: 1px solid #ddd; display: flex; gap: 10px; }
+.chat-input-area input { flex: 1; padding: 10px; font-size: 16px; }
+
+/* Message Bubble */
+.message { max-width: 60%; padding: 10px 15px; border-radius: 20px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+.msg-sent { align-self: flex-end; background: #0084ff; color: white; border-bottom-right-radius: 2px; }
+.msg-received { align-self: flex-start; background: #e4e6eb; color: black; border-bottom-left-radius: 2px; }
+.system-msg { align-self: center; background: none; color: gray; font-size: 0.8em; }
+
+.hidden { display: none; }
+
+.contacts-area { flex: 1; overflow-y: auto; margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px; }
+.contacts-list { list-style: none; padding: 0; margin: 0; }
+
+.contact-item { display: flex; align-items: center; padding: 10px; cursor: pointer; border-radius: 5px; transition: background 0.2s; }
+.contact-item:hover { background-color: #e0e0e0; }
+.contact-item.active { background-color: #d1e7dd; } /* Đang chọn */
+
+.avatar { width: 35px; height: 35px; background: #0084ff; color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; margin-right: 10px; }
+
+.info { display: flex; flex-direction: column; flex: 1; }
+.name { font-weight: 500; }
+
+/* Dấu chấm trạng thái */
+.status-dot { width: 10px; height: 10px; border-radius: 50%; background-color: #ccc; display: inline-block; margin-top: 2px; }
+.status-dot.online { background-color: #28a745; box-shadow: 0 0 3px #28a745; }
+
+.partner-status {
+    font-size: 0.9em;
+    font-weight: 500;
+    display: flex;             /* Để căn giữa chấm tròn và chữ */
+    align-items: center;       /* Căn giữa theo chiều dọc */
+    color: #7f8c8d;            /* Màu xám mặc định (Offline) */
+}
+
+/* Vẽ chấm tròn bằng pseudo-element (không cần thêm thẻ div thừa) */
+.partner-status::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 6px;         /* Khoảng cách giữa chấm và chữ */
+    border-radius: 50%;        /* Bo tròn thành hình tròn */
+    
+    /* Màu xám cho trạng thái Offline */
+    background: #bdc3c7;       
+}
+
+/* --- TRẠNG THÁI ONLINE --- */
+.partner-status.online {
+    color: #009933;            /* Chữ màu xanh lá đậm đà */
+}
+
+.partner-status.online::before {
+    /* Tạo hiệu ứng quả cầu 3D màu xanh ngọc giống ảnh */
+    background: radial-gradient(circle at 30% 30%, #5cd65c, #009933);
+    box-shadow: 0 0 4px rgba(0, 153, 51, 0.4); /* Thêm chút ánh sáng tỏa ra */
+}
+
+.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+.notification-container { position: relative; }
+
+.icon-btn { background: none; border: none; font-size: 1.5em; cursor: pointer; position: relative; }
+.badge { position: absolute; top: 0; right: 0; background: red; color: white; font-size: 0.4em; padding: 2px 5px; border-radius: 50%; }
+
+/* POPUP DANH SÁCH */
+.requests-popup {
+    position: absolute;
+    top: 40px;
+    left: 0;
+    width: 250px;
+    background: white;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    border-radius: 8px;
+    padding: 10px;
+    z-index: 1000;
+    
+    /* Scrollable */
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.requests-popup h4 { margin: 0 0 10px 0; font-size: 0.9em; color: #666; }
+.requests-popup ul { list-style: none; padding: 0; margin: 0; }
+.requests-popup li { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; }
+
+.btn-accept { background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+.btn-accept:hover { background: #218838; }
+
+.hidden { display: none; }
+
+/* public/styles/main.css */
+
+.my-profile {
+    display: flex;              /* Kích hoạt Flexbox */
+    justify-content: space-between; /* Đẩy tên sang trái, nút sang phải */
+    align-items: center;        /* Căn giữa theo chiều dọc */
+    padding-bottom: 15px;
+    border-bottom: 2px solid #eee; /* Đường kẻ dưới nhẹ nhàng */
+    margin-bottom: 15px;
+}
+
+.user-name {
+    margin: 0;                 /* Bỏ margin thừa của thẻ h3 */
+    font-size: 1.1em;
+    white-space: nowrap;       /* Không xuống dòng tên */
+    overflow: hidden;
+    text-overflow: ellipsis;   /* Nếu tên dài quá thì hiện dấu ... */
+    max-width: 140px;          /* Giới hạn chiều rộng tên */
+}
+
+.profile-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;                 /* Khoảng cách giữa Chuông và nút Đăng xuất */
+}
+
+/* Tinh chỉnh nút Đăng xuất cho đẹp hơn */
+.small-btn {
+    background-color: #ff4d4d; /* Màu đỏ nhẹ */
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 30px;              /* Chiều cao bằng với icon chuông */
+}
+
+.small-btn:hover {
+    background-color: #cc0000;
+}
+
+/* Tinh chỉnh nút Chuông để icon to rõ hơn chút */
+.icon-btn {
+    font-size: 1.3em; 
+    padding: 0;
+    display: flex;
+    align-items: center;
+}
