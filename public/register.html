@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng ký - SecureChat E2EE</title>
+    <link rel="stylesheet" href="styles/main.css"> <style>
+        /* CSS nội bộ nhanh cho form auth */
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; }
+        .auth-container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 350px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #0084ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .error { color: red; font-size: 0.9em; margin-bottom: 10px; display: none; }
+        .success { color: green; font-size: 0.9em; margin-bottom: 10px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h2 style="text-align: center;">SecureChat Đăng ký</h2>
+        <p style="text-align: center; font-size: 0.8em; color: gray;">Mã hóa đầu cuối (E2EE)</p>
+        
+        <div id="error-msg" class="error"></div>
+        <div id="success-msg" class="success"></div>
+
+        <form id="register-form">
+            <input type="text" id="username" placeholder="Tên đăng nhập" required autocomplete="off">
+            <input type="password" id="password" placeholder="Mật khẩu" required minlength="6">
+            <input type="password" id="confirm-password" placeholder="Xác nhận mật khẩu" required>
+            
+            <button type="submit" id="btn-submit">Đăng ký & Tạo Khóa</button>
+        </form>
+        
+        <p style="text-align: center; margin-top: 15px;">
+            Đã có tài khoản? <a href="login.html">Đăng nhập</a>
+        </p>
+    </div>
+
+    <script type="module" src="js/register.js"></script>
+</body>
+</html>
