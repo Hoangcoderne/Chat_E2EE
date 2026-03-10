@@ -1,23 +1,26 @@
 // public/js/app.js
 import { importPublicKey, deriveSharedSecret, encryptMessage, decryptMessage } from './crypto/key-manager.js';
 
+// ============================================================
+// 1. CONFIG & STATE MANAGEMENT
+// ============================================================
 const socket = io();
+
+// State
 let friendRequests = [];
 let notifications = [];
-// --- STATE QUẢN LÝ TRẠNG THÁI ---
 let myIdentity = {
     userId: null,
     username: null,
-    privateKey: null // Sẽ load từ IndexedDB
+    privateKey: null 
 };
-
 let currentChat = {
     partnerId: null,
     partnerPublicKey: null,
-    sharedSecret: null // Khóa phiên chung
+    sharedSecret: null 
 };
 
-// --- DOM ELEMENTS ---
+// DOM Elements
 const dom = {
     status: document.getElementById('status-bar'),
     myUsername: document.getElementById('my-username'),
@@ -34,48 +37,50 @@ const dom = {
     btnRequests: document.getElementById('btn-requests'),
     reqPopup: document.getElementById('requests-popup'),
     reqList: document.getElementById('requests-list'),
-    reqCount: document.getElementById('req-count')
+    reqCount: document.getElementById('req-count'),
+    chatInputArea: document.getElementById('chat-input-area'),
+    blockOverlay: document.getElementById('block-overlay'),
+    blockTitle: document.getElementById('block-title'),
+    btnUnblock: document.getElementById('btn-unblock')
 };
 
-// --- 1. KHỞI TẠO ỨNG DỤNG ---
-async function initApp() {
-    // A. Kiểm tra Session Storage
+socket.on('connect', () => {
     const userId = sessionStorage.getItem('userId');
-    const username = sessionStorage.getItem('username');
-    
-    if (!userId || !username) {
-        window.location.href = '/login.html'; // Chưa login thì đá về trang login
-        return;
-    }
-
-    // B. Load Private Key từ IndexedDB
-    try {
-        const privateKey = await loadKeyFromDB();
-        if (!privateKey) throw new Error("Không tìm thấy Private Key");
-        
-        // Lưu vào State
-        myIdentity = { userId, username, privateKey };
-        dom.myUsername.innerText = username;
-        
-        // C. Kết nối Socket
+    if (userId) {
         socket.emit('join_user', userId);
-        dom.status.innerText = "🟢 Online";
-        dom.status.style.color = "green";
-        await loadContacts();
-        await loadFriendRequests(); // Tải danh sách lời mời kết bạn
-        await loadNotifications();
-
-        console.log("App Initialized. Ready to E2EE.");
-
-    } catch (err) {
-        console.error(err);
-        alert("Lỗi phiên đăng nhập: Mất khóa bảo mật. Vui lòng đăng nhập lại.");
-        logout();
+        console.log("Đã phục hồi định danh Socket sau khi reconnect.");
     }
-   
+});
+
+// ============================================================
+// 2. HELPER FUNCTIONS (AUTH & DB)
+// ============================================================
+
+// [MỚI] Hàm Wrapper để gọi API có đính kèm Token
+async function authFetch(url, options = {}) {
+    const token = localStorage.getItem('token');
+    
+    // Nếu không có headers thì tạo mới
+    if (!options.headers) options.headers = {};
+    
+    // Đính kèm Token và Content-Type
+    options.headers['Authorization'] = `Bearer ${token}`;
+    if (!options.headers['Content-Type']) {
+        options.headers['Content-Type'] = 'application/json';
+    }
+
+    const res = await fetch(url, options);
+
+    // Nếu Token hết hạn hoặc không hợp lệ (Lỗi 401) -> Đá văng ra login
+    if (res.status === 401) {
+        alert("Phiên đăng nhập hết hạn.");
+        logout();
+        return null;
+    }
+    return res;
 }
 
-// --- HELPER: Đọc IndexedDB ---
+// Hàm đọc Private Key từ IndexedDB
 function loadKeyFromDB() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open("SecureChatDB", 1);
@@ -92,374 +97,358 @@ function loadKeyFromDB() {
     });
 }
 
-function updateHeaderStatus(userId) {
-    // Nếu không phải người đang chat thì bỏ qua
-    if (currentChat.partnerId !== userId) return;
-
-    // Kiểm tra trạng thái trên Sidebar (nguồn sự thật)
-    const sidebarDot = document.getElementById(`status-${userId}`);
-    if (sidebarDot && sidebarDot.classList.contains('online')) {
-        dom.partnerStatus.innerText = "Online";
-        dom.partnerStatus.classList.add('online');
-    } else {
-        dom.partnerStatus.innerText = "Offline"; // Hoặc hiện thời gian offline nếu muốn
-        dom.partnerStatus.classList.remove('online');
-    }
-}
-
 function logout() {
     sessionStorage.clear();
+    localStorage.removeItem('token'); // Xóa cả token
     window.location.href = '/login.html';
 }
 
-dom.btnLogout.addEventListener('click', logout);
+// ============================================================
+// 3. INITIALIZATION
+// ============================================================
 
-// Sự kiện bấm nút "Kết nối"
-dom.btnConnect.addEventListener('click', () => {
-    startHandshake(dom.searchInput.value.trim());
-});
+async function initApp() {
+    // Kiểm tra Token và Session
+    const token = localStorage.getItem('token');
+    const userId = sessionStorage.getItem('userId');
+    const username = sessionStorage.getItem('username');
+    
+    if (!token || !userId || !username) {
+        window.location.href = '/login.html';
+        return;
+    }
 
-// Server trả về Public Key của đối phương
+    try {
+        // Load Private Key
+        const privateKey = await loadKeyFromDB();
+        if (!privateKey) throw new Error("Không tìm thấy Private Key");
+        
+        // Lưu State
+        myIdentity = { userId, username, privateKey };
+        dom.myUsername.innerText = username;
+        
+        // Kết nối Socket
+        socket.emit('join_user', userId);
+        dom.status.innerText = "🟢 Online";
+        dom.status.style.color = "green";
+
+        // Load dữ liệu ban đầu
+        await loadContacts();
+        await loadFriendRequests();
+        await loadNotifications();
+
+        console.log("✅ App Initialized. Ready to E2EE.");
+
+    } catch (err) {
+        console.error(err);
+        alert("Lỗi khởi tạo: " + err.message);
+        logout();
+    }
+}
+
+// ============================================================
+// 4. SOCKET EVENT LISTENERS (REAL-TIME)
+// ============================================================
+
+// A. Handshake: Nhận Public Key -> Tạo Shared Secret
 socket.on('response_public_key', async (data) => {
     try {
-        const { userId, publicKey, username } = data; // username có thể server trả về hoặc lấy từ input
-        console.log("Đã nhận Public Key của đối phương:", userId);
+        const { userId, publicKey, username } = data;
+        console.log("🔑 Handshake: Received key from", username);
 
-        // A. Import Public Key của họ vào format WebCrypto
         const partnerKeyObj = await importPublicKey(publicKey);
-
-        // B. TẠO SHARED SECRET (Magic Step!)
-        // Trộn Private Key của mình + Public Key của họ
         const sharedKey = await deriveSharedSecret(myIdentity.privateKey, partnerKeyObj);
 
-        // C. Lưu vào State hiện tại
         currentChat = {
             partnerId: userId,
             partnerPublicKey: partnerKeyObj,
             sharedSecret: sharedKey
         };
 
-        // THÊM: Nếu người này chưa có trong sidebar thì thêm vào
-        renderContactItem({ _id: data.userId, username: data.username });
-        
-        // Highlight người đó
-        document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
-        const item = document.querySelector(`.contact-item[data-id="${data.userId}"]`);
-        if(item) item.classList.add('active');
-        
-        updateHeaderStatus(data.userId);
-
-        // D. Cập nhật UI
+        // UI Updates
+        updateHeaderStatus(userId);
         dom.chatHeader.classList.remove('hidden');
-        dom.partnerName.innerText = dom.searchInput.value; // Hoặc data.username
+        dom.partnerName.innerText = username || dom.searchInput.value;
         dom.msgInput.disabled = false;
         dom.btnSend.disabled = false;
-        dom.messagesList.innerHTML = `<div class="system-msg"> Đã thiết lập kênh E2EE an toàn. Server không thể đọc tin nhắn này.</div>`;
+        dom.messagesList.innerHTML = `<div class="system-msg">🔒 Đã thiết lập kênh E2EE.</div>`;
         
-        // Sau khi đã có Shared Secret, ta mới giải mã được lịch sử
+        // Highlight Sidebar
+        document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
+        const item = document.querySelector(`.contact-item[data-id="${userId}"]`);
+        if(item) item.classList.add('active');
+
+        // Load History
         await loadChatHistory(); 
-        
 
     } catch (err) {
         console.error("Lỗi Handshake:", err);
-        alert("Lỗi thiết lập mã hóa. Kiểm tra Console.");
+        alert("Lỗi thiết lập mã hóa.");
     }
 });
 
-// Nếu không tìm thấy user
-socket.on('error', (msg) => {
-    alert(msg);
-});
-
-dom.btnSend.addEventListener('click', sendMessage);
-dom.msgInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendMessage();
-});
-
-async function sendMessage() {
-    const text = dom.msgInput.value.trim();
-    if (!text || !currentChat.sharedSecret) return;
-
-    try {
-        // A. Mã hóa tin nhắn
-        // encryptMessage trả về { iv, ciphertext } (đều là Base64)
-        const encryptedData = await encryptMessage(text, currentChat.sharedSecret);
-
-        // B. Gửi lên Server (Relay)
-        const payload = {
-            senderId: myIdentity.userId,
-            recipientId: currentChat.partnerId,
-            encryptedContent: encryptedData.ciphertext,
-            iv: encryptedData.iv
-        };
-
-        socket.emit('send_message', payload);
-
-        // C. Hiển thị lên màn hình mình (Tin mình gửi thì mình tự hiện text gốc)
-        appendMessage(text, 'sent');
-        dom.msgInput.value = '';
-
-    } catch (err) {
-        console.error("Lỗi gửi tin:", err);
-        alert("Không thể mã hóa tin nhắn.");
-    }
-}
-
-// --- 4. XỬ LÝ NHẬN TIN NHẮN ---
-
+// B. Nhận tin nhắn
 socket.on('receive_message', async (payload) => {
-    // payload gồm: { senderId, encryptedContent, iv, timestamp }
-    
-    // Kiểm tra xem tin nhắn có phải từ người đang chat không
-    // (Trong demo này ta chỉ hỗ trợ chat 1-1 tại 1 thời điểm)
-    if (payload.senderId !== currentChat.partnerId) {
-        console.log("⚠️ Nhận tin từ người lạ (hoặc chưa connect):", payload.senderId);
-        // Có thể hiện thông báo nhỏ ở đây
-        return;
-    }
+    if (payload.senderId !== currentChat.partnerId) return;
 
     try {
-        // A. Giải mã tin nhắn
-        // decryptMessage cần { ciphertext, iv } và SharedSecret
         const decryptedText = await decryptMessage(
             { ciphertext: payload.encryptedContent, iv: payload.iv },
             currentChat.sharedSecret
         );
-
-        // B. Hiển thị
         appendMessage(decryptedText, 'received');
-
     } catch (err) {
-        console.error("Giải mã thất bại:", err);
-        appendMessage("⚠️ [Tin nhắn lỗi - Không thể giải mã]", 'received');
+        console.error("Decryption failed:", err);
+        appendMessage("⚠️ [Lỗi giải mã]", 'received');
     }
 });
 
-// --- HELPER: Vẽ tin nhắn lên giao diện ---
-function appendMessage(text, type) {
+// C. Trạng thái Online/Offline
+socket.on('user_status_change', (data) => {
+    const dot = document.getElementById(`status-${data.userId}`);
+    if (dot) {
+        data.status === 'online' ? dot.classList.add('online') : dot.classList.remove('online');
+    }
+    updateHeaderStatus(data.userId);
+});
+
+// D. Nhận Lời mời kết bạn
+socket.on('receive_friend_request', (data) => {
+    friendRequests.push(data);
+    updateRequestUI();
+    // Có thể thêm âm thanh thông báo tại đây
+});
+
+// E. Được chấp nhận kết bạn
+socket.on('request_accepted', (data) => {
+    console.log(`${data.accepterName} đã chấp nhận!`);
+    if (data.notification) {
+        // [FIX] Đánh dấu isTemp=true để khi xóa biết không cần gọi DB
+        data.notification._id = 'temp_' + Date.now();
+        data.notification.isTemp = true;
+        notifications.unshift(data.notification);
+        updateRequestUI();
+    }
+    renderContactItem({ 
+        _id: data.accepterId, 
+        username: data.accepterName, 
+        online: true
+    });
+    startHandshake(data.accepterName);
+});
+
+// F. Tín hiệu bắt đầu Handshake (Khi mình chấp nhận người khác)
+socket.on('start_handshake_init', (data) => {
+    console.log("Start Handshake Init...");
+    renderContactItem({ _id: data.targetId, username: data.targetUsername, online: true });
+    
+    const item = document.querySelector(`.contact-item[data-id="${data.targetId}"]`);
+    if (item) {
+        // [FIX] Chỉ tự động click nếu KHÔNG bị block (tránh race condition)
+        if (item.dataset.status !== 'blocked') {
+            item.click();
+            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+});
+
+// G. Người khác chặn mình -> Tự động chuyển màn hình
+socket.on('you_have_been_blocked', ({ blockerId }) => {
+    const li = document.querySelector(`.contact-item[data-id="${blockerId}"]`);
+    if (li) {
+        // Cập nhật dataset: status là bị chặn, nhưng mình KHÔNG phải là người chủ động chặn
+        li.dataset.status = 'blocked';
+        li.dataset.isBlocker = 'false';
+        
+        // Nếu mình ĐANG MỞ khung chat với người đó thì ép tải lại UI để hiện khung đen ngay lập tức
+        if (currentChat.partnerId === blockerId) {
+            li.click();
+        }
+    }
+});
+
+// H. Người khác bỏ chặn mình -> Tự động mở lại khung chat
+socket.on('you_have_been_unblocked', ({ unblockerId }) => {
+    const li = document.querySelector(`.contact-item[data-id="${unblockerId}"]`);
+    if (li) {
+        li.dataset.status = 'accepted';
+        li.dataset.isBlocker = 'false';
+        
+        // Nếu đang mở khung chat thì tự động Handshake lại để chat tiếp
+        if (currentChat.partnerId === unblockerId) {
+            li.click();
+        }
+    }
+});
+
+socket.on('error', (msg) => alert(msg));
+
+// [MỚI] Nhận thông báo hệ thống từ server (vd: chưa phải bạn bè)
+socket.on('system_message', ({ text }) => {
     const div = document.createElement('div');
-    div.classList.add('message', type === 'sent' ? 'msg-sent' : 'msg-received');
-    div.innerText = text; // innerText an toàn, chống XSS
-    
+    div.className = 'message system-msg';
+    div.innerText = text;
     dom.messagesList.appendChild(div);
-    
-    // Tự động cuộn xuống cuối
     dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
+});
+
+// ============================================================
+// 5. API CALLS (DATA LOADING)
+// ============================================================
+
+// Tải danh sách bạn bè
+async function loadContacts() {
+    try {
+        // [QUAN TRỌNG] Dùng authFetch thay vì fetch thường
+        const res = await authFetch(`/api/chat/contacts`);
+        if(!res) return;
+        
+        const contacts = await res.json();
+        dom.contactsList.innerHTML = ''; 
+        contacts.forEach(user => renderContactItem(user));
+    } catch (err) {
+        console.error("Lỗi tải contacts:", err);
+    }
 }
 
-// --- 5. TẢI VÀ GIẢI MÃ LỊCH SỬ CHAT ---
+// Tải lịch sử chat
 async function loadChatHistory() {
-    const userId = myIdentity.userId;
-    const partnerId = currentChat.partnerId;
-
+    const { userId } = myIdentity;
+    const { partnerId, sharedSecret } = currentChat;
     if (!userId || !partnerId) return;
 
     try {
-        console.log("Đang tải lịch sử chat...");
-        
-        // Gọi API Backend
-        const res = await fetch(`/api/chat/history/${userId}/${partnerId}`);
-        const messages = await res.json();
+        const res = await authFetch(`/api/chat/history/${partnerId}`);
+        if(!res) return;
 
-        // Xóa tin nhắn chào mừng mặc định
-        dom.messagesList.innerHTML = ''; 
-        
+        const messages = await res.json();
+        dom.messagesList.innerHTML = '';
+
         if (messages.length === 0) {
-            dom.messagesList.innerHTML = '<div class="system-msg">Chưa có tin nhắn nào. Hãy bắt đầu cuộc trò chuyện!</div>';
+            dom.messagesList.innerHTML = '<div class="system-msg">Chưa có tin nhắn nào.</div>';
             return;
         }
 
-        // Lặp qua từng tin nhắn để giải mã
         for (const msg of messages) {
             try {
-                // msg.encryptedContent và msg.iv là chuỗi Base64 từ DB
                 const decryptedText = await decryptMessage(
                     { ciphertext: msg.encryptedContent, iv: msg.iv },
-                    currentChat.sharedSecret
+                    sharedSecret
                 );
-
-                // Xác định chiều tin nhắn (Gửi hay Nhận)
                 const type = (msg.sender === userId) ? 'sent' : 'received';
-                
-                // Hiển thị ra màn hình
                 appendMessage(decryptedText, type);
             } catch (err) {
-                console.error("Lỗi giải mã tin nhắn cũ:", err);
-                appendMessage("[Không thể giải mã tin nhắn này]", 'received');
+                appendMessage("[Tin nhắn lỗi]", 'received');
             }
         }
-        
-        // Cuộn xuống cuối cùng
         dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
-        console.log(`Đã tải ${messages.length} tin nhắn.`);
-
     } catch (err) {
         console.error("Lỗi tải history:", err);
     }
 }
 
-// --- 6. QUẢN LÝ DANH SÁCH LIÊN HỆ ---
-
-async function loadContacts() {
+// Tải lời mời kết bạn
+async function loadFriendRequests() {
     try {
-        const res = await fetch(`/api/chat/contacts/${myIdentity.userId}`);
-        const contacts = await res.json();
+        const res = await authFetch(`/api/chat/requests`);
+        if(!res) return;
         
-        dom.contactsList.innerHTML = ''; // Xóa cũ
-        contacts.forEach(user => {
-            renderContactItem(user);
-        });
-
-    } catch (err) {
-        console.error("Lỗi tải danh sách liên hệ:", err);
-    }
+        const data = await res.json();
+        if (Array.isArray(data)) {
+            friendRequests = data;
+            updateRequestUI();
+        }
+    } catch (err) { console.error(err); }
 }
 
+// Tải thông báo
+async function loadNotifications() {
+    try {
+        const res = await authFetch(`/api/chat/notifications`);
+        if(!res) return;
+
+        notifications = await res.json();
+        updateRequestUI();
+    } catch (err) { console.error(err); }
+}
+
+// ============================================================
+// 6. UI RENDERING & INTERACTIONS
+// ============================================================
+
+// Vẽ 1 dòng liên hệ vào Sidebar
 function renderContactItem(user) {
-    // Kiểm tra xem đã có trong list chưa (tránh trùng)
     if (document.querySelector(`.contact-item[data-id="${user._id}"]`)) return;
 
     const li = document.createElement('li');
     li.className = 'contact-item';
-    li.dataset.id = user._id; // Lưu ID để tìm
+    li.dataset.id = user._id;
     li.dataset.username = user.username;
-    
     const onlineClass = user.online ? 'online' : '';
 
+    li.dataset.status = user.status; 
+    li.dataset.isBlocker = user.isBlocker;
+
     li.innerHTML = `
+        <div class="avatar-container">
             <div class="avatar">${user.username[0].toUpperCase()}</div>
-            <div class="info">
-                <span class="name">${user.username}</span>
-                <span class="status-dot ${onlineClass}" id="status-${user._id}"></span>
-            </div>
+            <div class="status-dot ${onlineClass}" id="status-${user._id}"></div>
+        </div>
+        <div class="contact-info">
+            <div class="contact-name">${user.username}</div>
+            <div class="last-message">Nhấn để chat</div>
+        </div>
+        <button class="contact-options-btn" onclick="toggleMenu(event, '${user._id}')">⋮</button>
+        <div id="menu-${user._id}" class="options-menu hidden">
+            <button class="danger" onclick="handleBlock(event, '${user._id}')">🚫 Chặn</button>
+            <button class="danger" onclick="handleUnfriend(event, '${user._id}')">❌ Hủy kết bạn</button>
+        </div>
     `;
 
-    // SỰ KIỆN CLICK: Bắt đầu chat với người này
-    li.addEventListener('click', () => {
-        // Highlight người đang chọn
+    li.addEventListener('click', (e) => {
+        if (e.target.closest('.contact-options-btn') || e.target.closest('.options-menu')) return;
+        
         document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
         li.classList.add('active');
 
-        // Điền vào ô tìm kiếm và kích hoạt quy trình Handshake
         dom.searchInput.value = user.username;
-        startHandshake(user.username); // Hàm này mình tách ra bên dưới
+        
+        // KIỂM TRA TRẠNG THÁI CHẶN TRƯỚC KHI HANDSHAKE
+        const status = li.dataset.status;
+        const isBlocker = li.dataset.isBlocker === 'true';
+
+        if (status === 'blocked') {
+            dom.chatInputArea.classList.add('hidden');
+            dom.blockOverlay.classList.remove('hidden');
+            dom.chatHeader.classList.remove('hidden');
+            dom.partnerName.innerText = user.username;
+            dom.messagesList.innerHTML = `<div class="system-msg">Không thể lấy khóa E2EE do cuộc trò chuyện đã bị chặn.</div>`;
+            
+            if (isBlocker) {
+                dom.blockTitle.innerText = `Bạn đã chặn tin nhắn từ ${user.username}`;
+                dom.btnUnblock.classList.remove('hidden');
+                dom.btnUnblock.onclick = () => handleUnblock(user._id); // Gắn sự kiện mở chặn
+            } else {
+                dom.blockTitle.innerText = `Bạn không thể trả lời cuộc trò chuyện này`;
+                dom.btnUnblock.classList.add('hidden'); // Ẩn nút nếu là người bị chặn
+            }
+        } else {
+            // Nếu bình thường thì hiện ô nhập tin nhắn và Handshake
+            dom.chatInputArea.classList.remove('hidden');
+            dom.blockOverlay.classList.add('hidden');
+            startHandshake(user.username);
+        }
     });
 
     dom.contactsList.appendChild(li);
 }
 
-function startHandshake(targetUsername) {
-    if (!targetUsername) return;
-    if (targetUsername === myIdentity.username) return alert("Không thể chat với mình");
-
-    console.log(`Kết nối với: ${targetUsername}...`);
-    socket.emit('request_public_key', { username: targetUsername });
-}
-
-// --- 7. XỬ LÝ TRẠNG THÁI ONLINE/OFFLINE ---
-
-socket.on('user_status_change', (data) => {
-    // data = { userId, status: 'online' | 'offline' }
-    const dot = document.getElementById(`status-${data.userId}`);
-    if (dot) {
-        if (data.status === 'online') {
-            dot.classList.add('online');
-        } else {
-            dot.classList.remove('online');
-        }
-    }
-    updateHeaderStatus(data.userId);
-});
-
-const originalSocketResponse = socket.listeners('response_public_key')[0];
-
-// 2. Xử lý logic Popup (Mở/Đóng khi click ra ngoài)
-dom.btnRequests.addEventListener('click', (e) => {
-    e.stopPropagation(); // Chặn sự kiện nổi bọt
-    dom.reqPopup.classList.toggle('hidden');
-});
-
-document.addEventListener('click', (e) => {
-    if (!dom.reqPopup.contains(e.target) && e.target !== dom.btnRequests) {
-        dom.reqPopup.classList.add('hidden');
-    }
-});
-
-// 3. THAY ĐỔI NÚT KẾT NỐI (Quan trọng)
-// Thay vì gọi startHandshake ngay, ta gửi lời mời
-dom.btnConnect.addEventListener('click', () => {
-    const targetUsername = dom.searchInput.value.trim();
-    if (!targetUsername) return;
-    
-    // Nếu đã có trong danh sách chat thì Handshake luôn (như cũ)
-    const existingContact = document.querySelector(`.contact-item[data-username="${targetUsername}"]`);
-    if (existingContact) {
-        startHandshake(targetUsername);
-    } else {
-        // Nếu là người mới -> Gửi lời mời
-        socket.emit('send_friend_request', { targetUsername });
-        alert(`Đã gửi lời mời kết nối tới ${targetUsername}. Chờ họ chấp nhận nhé!`);
-    }
-});
-
-// 4. XỬ LÝ SỰ KIỆN SOCKET MỚI
-
-// A. Nhận lời mời từ người khác
-socket.on('receive_friend_request', (data) => {
-    // data = { fromUser, fromId }
-    friendRequests.push(data);
-    updateRequestUI();
-    alert(`Bạn có lời mời kết nối mới từ ${data.fromUser}`);
-});
-
-// B. Bên kia đã chấp nhận -> Bắt đầu Handshake (Sửa lỗi mã hóa ở đây)
-socket.on('request_accepted', (data) => {
-    // data = { accepterName, notification }
-    console.log(`${data.accepterName} đã chấp nhận!`);
-    
-    // Thêm vào danh sách thông báo client để hiện số đỏ ngay
-    if (data.notification) {
-        data.notification._id = 'temp_' + Date.now();
-        notifications.unshift(data.notification); // Thêm vào đầu danh sách
-        updateRequestUI();
-    }
-
-    startHandshake(data.accepterName);
-});
-
-// C. Tự mình chấp nhận -> Cũng bắt đầu Handshake
-socket.on('start_handshake_init', (data) => {
-    // data = { targetId, targetUsername }
-    
-    console.log("Đã chấp nhận kết bạn. Đang mở chat...");
-
-    // 1. Ép hiển thị người đó lên Sidebar ngay lập tức (kể cả chưa có tin nhắn)
-    // Giả định họ đang online vì vừa tương tác
-    renderContactItem({ 
-        _id: data.targetId, 
-        username: data.targetUsername,
-        online: true 
-    });
-
-    // 2. Tìm item vừa tạo và kích hoạt sự kiện Click để vào chat
-    const item = document.querySelector(`.contact-item[data-id="${data.targetId}"]`);
-    if (item) {
-        item.click(); // Tự động click vào để mở chat
-        
-        // Cuộn thanh bên trái đến chỗ người đó (nếu danh sách dài)
-        item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-});
-
-// 5. Hàm cập nhật giao diện Popup
+// Cập nhật Popup Thông báo
 function updateRequestUI() {
-    // Đảm bảo biến là mảng (tránh lỗi null/undefined)
     if (!friendRequests) friendRequests = [];
     if (!notifications) notifications = [];
-
     const totalCount = friendRequests.length + notifications.length;
 
-    // Hiển thị số đỏ trên chuông
     if (totalCount > 0) {
         dom.reqCount.innerText = totalCount;
         dom.reqCount.classList.remove('hidden');
@@ -471,74 +460,223 @@ function updateRequestUI() {
 
     dom.reqList.innerHTML = '';
 
-    // A. VẼ LỜI MỜI (Ưu tiên hiện trước)
+    // Vẽ Lời mời
     friendRequests.forEach(req => {
         const li = document.createElement('li');
-        li.className = 'req-item'; // Bạn có thể CSS thêm cho class này
+        li.className = 'req-item';
         li.innerHTML = `
             <div style="flex:1">👋 <b>${req.fromUser}</b> mời kết bạn</div>
             <button class="btn-accept small-btn" style="background:#28a745; margin-left:5px">✔</button>
         `;
-
-        // Xử lý nút Chấp nhận
         li.querySelector('.btn-accept').addEventListener('click', () => {
             socket.emit('accept_friend_request', { requesterId: req.fromId });
-            // Xóa tạm khỏi UI
             friendRequests = friendRequests.filter(r => r.fromId !== req.fromId);
             updateRequestUI();
         });
         dom.reqList.appendChild(li);
     });
 
-    // B. VẼ THÔNG BÁO (Hiện sau)
+    // Vẽ Thông báo
     notifications.forEach(notif => {
         const li = document.createElement('li');
         li.className = 'notif-item';
-        li.style.borderLeft = "3px solid #0084ff"; // Đánh dấu khác biệt
+        li.style.borderLeft = "3px solid #0084ff";
         li.style.backgroundColor = "#f0f8ff";
-
         li.innerHTML = `
             <div style="flex:1; font-size:0.9em">${notif.content}</div>
             <button class="btn-clear small-btn" style="background:#999; margin-left:5px">✕</button>
         `;
-
-        // Xử lý nút Xóa thông báo
         li.querySelector('.btn-clear').addEventListener('click', () => {
-            if (notif._id) {
+            // [FIX] Chỉ gọi server xóa nếu là thông báo thật (có ObjectId hợp lệ trong DB)
+            if (notif._id && !notif.isTemp) {
                 socket.emit('clear_notification', { notifId: notif._id });
             }
             notifications = notifications.filter(n => n._id !== notif._id);
             updateRequestUI();
         });
-
         dom.reqList.appendChild(li);
     });
 }
 
-async function loadFriendRequests() {
+// Vẽ tin nhắn
+function appendMessage(text, type) {
+    const div = document.createElement('div');
+    div.classList.add('message', type === 'sent' ? 'msg-sent' : 'msg-received');
+    div.innerText = text; 
+    dom.messagesList.appendChild(div);
+    dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
+}
+
+function updateHeaderStatus(userId) {
+    if (currentChat.partnerId !== userId) return;
+    const sidebarDot = document.getElementById(`status-${userId}`);
+    if (sidebarDot && sidebarDot.classList.contains('online')) {
+        dom.partnerStatus.innerText = "Online";
+        dom.partnerStatus.classList.add('online');
+    } else {
+        dom.partnerStatus.innerText = "Offline";
+        dom.partnerStatus.classList.remove('online');
+    }
+}
+
+// ============================================================
+// 7. USER ACTIONS & EVENT HANDLERS
+// ============================================================
+
+// Bắt đầu Handshake
+function startHandshake(targetUsername) {
+    if (!targetUsername) return;
+    if (targetUsername === myIdentity.username) return alert("Không thể chat với mình");
+    socket.emit('request_public_key', { username: targetUsername });
+}
+
+// Gửi tin nhắn
+async function sendMessage() {
+    const text = dom.msgInput.value.trim();
+    if (!text || !currentChat.sharedSecret) return;
+
     try {
-        const res = await fetch(`/api/chat/requests/${myIdentity.userId}`);
+        const encryptedData = await encryptMessage(text, currentChat.sharedSecret);
+        // [BẢO MẬT] Không gửi senderId lên nữa — server tự lấy từ socket.userId đã xác thực
+        const payload = {
+            recipientId: currentChat.partnerId,
+            encryptedContent: encryptedData.ciphertext,
+            iv: encryptedData.iv
+        };
+        socket.emit('send_message', payload);
+        appendMessage(text, 'sent');
+        dom.msgInput.value = '';
+    } catch (err) {
+        console.error("Lỗi gửi tin:", err);
+        alert("Không thể mã hóa tin nhắn.");
+    }
+}
+
+// --- GLOBAL HANDLERS (Gắn vào window để gọi từ HTML) ---
+
+window.toggleMenu = function(e, id) {
+    e.stopPropagation();
+    document.querySelectorAll('.options-menu').forEach(el => el.classList.add('hidden'));
+    const menu = document.getElementById(`menu-${id}`);
+    if (menu) menu.classList.toggle('hidden');
+}
+
+window.handleUnfriend = async function(e, targetId) {
+    e.stopPropagation();
+    if (!confirm("Bạn chắc chắn muốn hủy kết bạn?")) return;
+
+    try {
+        // [QUAN TRỌNG] Dùng authFetch để có Token
+        const res = await authFetch('/api/chat/unfriend', {
+            method: 'POST',
+            body: JSON.stringify({ targetId })
+        });
+        if(!res) return;
+
         const data = await res.json();
-        
-        // Cập nhật biến toàn cục friendRequests
-        if (Array.isArray(data)) {
-            friendRequests = data;
-            updateRequestUI(); // Vẽ lại giao diện (số đỏ, danh sách)
+        if (data.success) {
+            document.querySelector(`.contact-item[data-id="${targetId}"]`).remove();
+            if (currentChat.partnerId === targetId) {
+                dom.chatHeader.classList.add('hidden');
+                dom.messagesList.innerHTML = '';
+            }
         }
-    } catch (err) {
-        console.error("Lỗi tải lời mời kết bạn:", err);
-    }
+    } catch (err) { console.error(err); }
 }
 
-async function loadNotifications() {
+window.handleBlock = async function(e, targetId) {
+    e.stopPropagation();
+    if (!confirm("Bạn chắc chắn muốn chặn người này?")) return;
+
     try {
-        const res = await fetch(`/api/chat/notifications/${myIdentity.userId}`);
-        notifications = await res.json();
-        updateRequestUI(); // Gọi lại hàm vẽ UI (ta sẽ sửa hàm này để vẽ cả 2)
-    } catch (err) {
-        console.error(err);
-    }
+        const res = await authFetch('/api/chat/block', {
+            method: 'POST',
+            body: JSON.stringify({ targetId })
+        });
+        if(!res) return;
+
+        const data = await res.json();
+        if (data.success) {
+            // 1. Báo cho Server biết để đẩy giao diện chặn sang người kia
+            socket.emit('notify_block', { targetId });
+
+            // 2. Cập nhật UI của chính mình (Không reload trang nữa)
+            const li = document.querySelector(`.contact-item[data-id="${targetId}"]`);
+            if (li) {
+                li.dataset.status = 'blocked';
+                li.dataset.isBlocker = 'true';
+                
+                // Ẩn menu 3 chấm đi sau khi đã chặn
+                document.querySelectorAll('.options-menu').forEach(el => el.classList.add('hidden'));
+                
+                // Ép click vào người này để giao diện chat chuyển sang màu đen (Overlay)
+                li.click();
+            }
+        }
+    } catch (err) { console.error(err); }
 }
 
-// Chạy khởi tạo
+window.handleUnblock = async function(targetId) {
+    try {
+        const res = await authFetch('/api/chat/unblock', {
+            method: 'POST',
+            body: JSON.stringify({ targetId })
+        });
+        if(!res) return;
+
+        const data = await res.json();
+        if (data.success) {
+            // 1. Báo cho người kia biết đã được mở chặn
+            socket.emit('notify_unblock', { targetId });
+            
+            // 2. Cập nhật UI của mình
+            const li = document.querySelector(`.contact-item[data-id="${targetId}"]`);
+            if(li) {
+                li.dataset.status = 'accepted';
+                li.dataset.isBlocker = 'false';
+                li.click(); // Load lại luồng Handshake chat bình thường
+            }
+        }
+    } catch (err) { console.error(err); }
+};
+
+// --- DOM EVENT LISTENERS ---
+
+dom.btnLogout.addEventListener('click', logout);
+
+dom.btnSend.addEventListener('click', sendMessage);
+dom.msgInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+});
+
+// Click ra ngoài thì đóng popup/menu
+document.addEventListener('click', (e) => {
+    // Đóng menu 3 chấm
+    document.querySelectorAll('.options-menu').forEach(el => el.classList.add('hidden'));
+    
+    // Đóng popup thông báo
+    if (!dom.reqPopup.contains(e.target) && e.target !== dom.btnRequests) {
+        dom.reqPopup.classList.add('hidden');
+    }
+});
+
+dom.btnRequests.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dom.reqPopup.classList.toggle('hidden');
+});
+
+dom.btnConnect.addEventListener('click', () => {
+    const targetUsername = dom.searchInput.value.trim();
+    if (!targetUsername) return;
+    
+    const existingContact = document.querySelector(`.contact-item[data-username="${targetUsername}"]`);
+    if (existingContact) {
+        startHandshake(targetUsername);
+    } else {
+        socket.emit('send_friend_request', { targetUsername });
+        alert(`Đã gửi lời mời tới ${targetUsername}.`);
+    }
+});
+
+// CHẠY INIT
 initApp();

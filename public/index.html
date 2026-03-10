@@ -58,9 +58,15 @@
                 </div>
             </div>
 
-            <div class="chat-input-area">
-                <input type="text" id="msg-input" placeholder="Nhập tin nhắn bí mật..." disabled>
+            <div class="chat-input-area" id="chat-input-area">
+                <input type="text" id="msg-input" placeholder="Nhập tin nhắn" disabled>
                 <button id="btn-send" disabled>Gửi</button>
+            </div>
+
+            <div id="block-overlay" class="block-overlay hidden">
+                <h4 id="block-title">Bạn đã chặn tin nhắn của người này</h4>
+                <p id="block-desc">Các bạn sẽ không thể nhắn tin cho nhau trong đoạn chat này.</p>
+                <button id="btn-unblock" class="block-btn">Bỏ chặn</button>
             </div>
         </div>       
     </div>

@@ -27,7 +27,7 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
 .contacts-area { flex: 1; overflow-y: auto; margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px; }
 .contacts-list { list-style: none; padding: 0; margin: 0; }
 
-.contact-item { display: flex; align-items: center; padding: 10px; cursor: pointer; border-radius: 5px; transition: background 0.2s; }
+.contact-item { position: relative; display: flex; align-items: center; padding: 10px; cursor: pointer; border-radius: 5px; transition: background 0.2s; }
 .contact-item:hover { background-color: #e0e0e0; }
 .contact-item.active { background-color: #d1e7dd; } /* Đang chọn */
 
@@ -155,4 +155,98 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     padding: 0;
     display: flex;
     align-items: center;
+}
+
+/* Nút 3 chấm */
+.contact-options-btn {
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 1.2em;
+    padding: 0 5px;
+    cursor: pointer;
+    display: none; /* Mặc định ẩn, hover mới hiện */
+}
+
+.contact-item:hover .contact-options-btn {
+    display: block;
+}
+
+/* Menu Dropdown */
+.options-menu {
+    position: absolute;
+    right: 10px;
+    top: 30px;
+    background: white;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    border-radius: 5px;
+    z-index: 100;
+    overflow: hidden;
+    width: 120px;
+}
+
+.options-menu button {
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.options-menu button:hover {
+    background-color: #f0f0f0;
+}
+
+.options-menu button.danger {
+    color: red;
+}
+
+.hidden { display: none !important; }
+
+.block-overlay {
+    background-color: #242526;
+    color: #e4e6eb;
+    text-align: center;
+    padding: 20px;
+    border-top: 1px solid #3e4042;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    /* Chiếm vị trí của chat-input-area */
+    min-height: 80px; 
+}
+
+.block-overlay h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.block-overlay p {
+    margin: 0;
+    font-size: 14px;
+    color: #b0b3b8;
+}
+
+.block-btn {
+    background-color: #3a3b3c;
+    color: #e4e6eb;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    max-width: 350px;
+    margin-top: 10px;
+    transition: background-color 0.2s;
+}
+
+.block-btn:hover {
+    background-color: #4e4f50;
 }

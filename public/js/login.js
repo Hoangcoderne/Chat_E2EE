@@ -2,40 +2,30 @@
 import { 
     deriveKeysFromPassword, 
     decryptAndImportPrivateKey,
-    base64ToArrayBuffer // Helper này cần export từ key-manager hoặc copy lại
+    base64ToArrayBuffer 
 } from './crypto/key-manager.js';
 
 const form = document.getElementById('login-form');
 const btnSubmit = document.getElementById('btn-submit');
 const errorMsg = document.getElementById('error-msg');
 
-// --- HÀM HỖ TRỢ LƯU KHÓA VÀO INDEXED DB ---
-// Chúng ta cần lưu Private Key vào DB trình duyệt để trang chat (index.html) dùng được
-async function saveKeyToSession(privateKey) {
+// Hàm lưu khóa vào IndexedDB
+async function saveKeyToDB(privateKey) {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open("SecureChatDB", 1);
-        
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains("keys")) {
-                db.createObjectStore("keys", { keyPath: "id" });
-            }
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains("keys")) db.createObjectStore("keys", { keyPath: "id" });
         };
-
-        request.onsuccess = (event) => {
-            const db = event.target.result;
-            const tx = db.transaction("keys", "readwrite");
-            const store = tx.objectStore("keys");
-            // Lưu khóa với ID cố định là 'my-private-key'
-            store.put({ id: "my-private-key", key: privateKey });
-            
+        request.onsuccess = (e) => {
+            const tx = e.target.result.transaction("keys", "readwrite");
+            tx.objectStore("keys").put({ id: "my-private-key", key: privateKey });
             tx.oncomplete = () => resolve();
-            tx.onerror = () => reject("Lỗi lưu khóa vào DB");
+            tx.onerror = () => reject("Lỗi lưu DB");
         };
-        request.onerror = () => reject("Không mở được IndexedDB");
+        request.onerror = () => reject("Lỗi mở DB");
     });
 }
-// -------------------------------------------
 
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -45,66 +35,63 @@ form.addEventListener('submit', async (e) => {
     const password = document.getElementById('password').value;
 
     try {
-        console.log("--- BẮT ĐẦU QUY TRÌNH LOGIN E2EE ---");
+        console.log("--- BẮT ĐẦU LOGIN JWT ---");
 
-        // BƯỚC 1: Lấy thông tin Salt và Encrypted Key từ Server
-        // (Server chưa kiểm tra pass vội, chỉ đưa dữ liệu để client tự xử)
-        console.log("1. Fetching Login Params...");
-        const paramRes = await fetch('/api/auth/login-params', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username })
-        });
+        // BƯỚC 1: Lấy Salt
+        // Lưu ý: Route backend bạn cần đổi login-params thành GET /salt hoặc giữ nguyên logic lấy salt
+        const saltRes = await fetch(`/api/auth/salt?username=${username}`);
+        if (!saltRes.ok) throw new Error("Tài khoản không tồn tại");
+        const { salt } = await saltRes.json();
         
-        if (!paramRes.ok) throw new Error("Tài khoản không tồn tại");
-        const { salt, encryptedPrivateKey, iv } = await paramRes.json();
-        
-        // Convert salt từ base64 về Uint8Array để tính toán
-        const saltBuffer = _base64ToArrayBuffer(salt); 
+        // Salt từ server trả về có thể là Hex hoặc Base64. 
+        // Giả sử server trả Hex (từ controller cũ), ta cần convert.
+        // Nếu server mới trả Base64 thì dùng base64ToArrayBuffer.
+        // Ở đây giả định Salt là Base64 cho khớp với key-manager
+        const saltBuffer = base64ToArrayBuffer(salt); // Nếu lỗi thì kiểm tra lại định dạng Salt backend trả về
 
-        // BƯỚC 2: Tái tạo Key từ Password nhập vào
-        console.log("2. Deriving Keys...");
+        // BƯỚC 2: Derive Keys (Tạo AuthKey và EncryptionKey)
         const keys = await deriveKeysFromPassword(password, saltBuffer);
-        // keys.authKey: Dùng để login server
-        // keys.encryptionKey: Dùng để giải mã Private Key bên dưới
 
-        // BƯỚC 3: Giải mã Private Key (Thử thách Password)
-        // Nếu password sai -> encryptionKey sai -> giải mã thất bại -> văng lỗi
-        console.log("3. Decrypting Private Key...");
-        let privateKey;
-        try {
-            privateKey = await decryptAndImportPrivateKey(encryptedPrivateKey, iv, keys.encryptionKey);
-        } catch (decryptErr) {
-            throw new Error("Mật khẩu sai! Không thể giải mã Private Key.");
-        }
-
-        // BƯỚC 4: Xác thực với Server (Gửi AuthKey hash)
-        // Đến đây ta đã chắc chắn pass đúng (vì giải mã được), nhưng server cần verify
-        console.log("4. Authenticating with Server...");
+        // BƯỚC 3: Gửi Login (Kèm AuthKey)
         const loginRes = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, authKeyHash: keys.authKey })
+            body: JSON.stringify({ 
+                username, 
+                authKeyHash: keys.authKey // Gửi hash lên server so sánh
+            })
         });
 
-        const loginData = await loginRes.json();
-        if (!loginRes.ok) throw new Error(loginData.message || "Đăng nhập thất bại");
+        const data = await loginRes.json();
+        if (!loginRes.ok) throw new Error(data.message || "Đăng nhập thất bại");
 
-        // BƯỚC 5: Lưu session và chuyển hướng
-        console.log("5. Saving Session...");
+        // BƯỚC 4: Lưu Token JWT
+        console.log("Login OK! Saving Token...");
+        localStorage.setItem('token', data.token);
+        sessionStorage.setItem('userId', data.user.userId);
+        sessionStorage.setItem('username', data.user.username);
+
+        // BƯỚC 5: Giải mã Private Key (Dùng EncryptionKey ở Bước 2)
+        console.log("Decrypting Private Key...");
         
-        // 5a. Lưu thông tin public vào SessionStorage (RAM tab)
-        sessionStorage.setItem('userId', loginData.userId);
-        sessionStorage.setItem('username', loginData.username);
-        sessionStorage.setItem('publicKey', loginData.publicKey); // Lưu publicKey của mình
+        try {
+            // data.user chứa encryptedPrivateKey và iv
+            const privateKey = await decryptAndImportPrivateKey(
+                data.user.encryptedPrivateKey, 
+                data.user.iv, 
+                keys.encryptionKey
+            );
+            
+            // Lưu Private Key vào DB trình duyệt
+            await saveKeyToDB(privateKey);
+            
+        } catch (decryptErr) {
+            console.error(decryptErr);
+            throw new Error("Mật khẩu đúng nhưng không thể giải mã khóa bảo mật! (Dữ liệu lỗi)");
+        }
 
-        // 5b. Lưu Private Key vào IndexedDB (Để trang index.html đọc được)
-        await saveKeyToSession(privateKey);
-
-        showSuccess("Đăng nhập thành công! Đang vào chat...");
-        setTimeout(() => {
-            window.location.href = "/"; // Về trang chủ (Chat)
-        }, 1000);
+        showSuccess("Đăng nhập thành công!");
+        setTimeout(() => window.location.href = "/", 1000);
 
     } catch (err) {
         console.error(err);
@@ -113,25 +100,17 @@ form.addEventListener('submit', async (e) => {
     }
 });
 
-// Helper cục bộ (Nếu bạn chưa export từ key-manager thì dùng cái này)
-function _base64ToArrayBuffer(base64) {
-    const binary_string = window.atob(base64);
-    const len = binary_string.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binary_string.charCodeAt(i);
-    }
-    return bytes;
-}
-
 function showError(msg) {
     errorMsg.innerText = msg;
     errorMsg.style.display = 'block';
+    errorMsg.className = 'alert alert-danger';
 }
 function showSuccess(msg) {
-    // Có thể dùng thẻ success-msg nếu muốn
-    errorMsg.style.display = 'none';
-    alert(msg); 
+    const successMsg = document.getElementById('success-msg');
+    successMsg.innerText = msg;
+    successMsg.style.display = 'block';
+    successMsg.className = 'alert alert-success';
+    errorMsg.style.display = 'none'; // Ẩn lỗi nếu có
 }
 function setLoading(isLoading, text) {
     btnSubmit.disabled = isLoading;
