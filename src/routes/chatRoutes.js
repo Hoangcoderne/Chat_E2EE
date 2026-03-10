@@ -2,11 +2,16 @@
 const express = require('express');
 const router = express.Router();
 const chatController = require('../controllers/chatController');
+const authMiddleware = require('../middleware/authMiddleware');
 
-// API: GET /api/chat/history/:user1/:user2
-router.get('/history/:user1/:user2', chatController.getChatHistory);
-router.get('/contacts/:userId', chatController.getContacts);
-router.get('/requests/:userId', chatController.getFriendRequests); 
-router.get('/notifications/:userId', chatController.getNotifications);
+// API đã được bảo vệ tuyệt đối: Không truyền ID của bản thân lên URL nữa
+router.get('/history/:partnerId', authMiddleware, chatController.getChatHistory);
+router.get('/contacts', authMiddleware, chatController.getContacts);
+router.get('/requests', authMiddleware, chatController.getFriendRequests); 
+router.get('/notifications', authMiddleware, chatController.getNotifications);
+
+router.post('/unfriend', authMiddleware, chatController.unfriend);
+router.post('/block', authMiddleware, chatController.blockUser);
+router.post('/unblock', authMiddleware, chatController.unblockUser);
 
 module.exports = router;
