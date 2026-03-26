@@ -57,6 +57,7 @@ io.on('connection', (socket) => {
                 socket.emit('response_public_key', {
                     userId: user._id.toString(),
                     publicKey: user.publicKey,
+                    signingPublicKey: user.signingPublicKey, // [MỚI] gửi kèm để client verify
                     username: user.username
                 });
             } else {
@@ -68,15 +69,13 @@ io.on('connection', (socket) => {
     });
 
     // 3. Chuyển tiếp tin nhắn E2EE
-    socket.on('send_message', async ({ recipientId, encryptedContent, iv }) => {
+    socket.on('send_message', async ({ recipientId, encryptedContent, iv, signature }) => {
         try {
             if (!socket.userId) 
                 return socket.emit('error', 'Phiên kết nối bị gián đoạn. Vui lòng nhấn F5 để tải lại trang.');
 
-            // [BẢO MẬT] Luôn lấy senderId từ socket đã xác thực, không tin client
             const senderId = socket.userId;
 
-            // [BẢO MẬT] Kiểm tra quan hệ bạn bè trước khi lưu/gửi
             const friendship = await Friendship.findOne({
                 $or: [
                     { requester: senderId, recipient: recipientId },
@@ -84,10 +83,9 @@ io.on('connection', (socket) => {
                 ]
             });
 
-            // Chưa phải bạn bè -> Thông báo cho cả 2 phía
             if (!friendship || friendship.status === 'pending') {
                 socket.emit('system_message', { 
-                    text: '⚠️ Hai bạn chưa phải là bạn bè.'
+                    text: '⚠️ Hai bạn chưa phải là bạn bè. Hãy gửi lời mời kết bạn trước.'
                 });
                 io.to(recipientId).emit('system_message', {
                     text: `⚠️ ${socket.username || 'Ai đó'} cố gắng nhắn tin nhưng hai bạn chưa phải bạn bè.`
@@ -95,7 +93,6 @@ io.on('connection', (socket) => {
                 return;
             }
 
-            // Đang bị chặn -> Chặn hoàn toàn, không lưu, không gửi
             if (friendship.status === 'blocked') {
                 socket.emit('error', 'Không thể gửi tin nhắn. Cuộc trò chuyện đã bị chặn.');
                 return;
@@ -105,7 +102,8 @@ io.on('connection', (socket) => {
                 sender: senderId,
                 recipient: recipientId,
                 encryptedContent,
-                iv
+                iv,
+                signature: signature || null  // [MỚI] lưu chữ ký nếu có
             });
             await newMessage.save();
 
@@ -113,6 +111,7 @@ io.on('connection', (socket) => {
                 senderId,
                 encryptedContent,
                 iv,
+                signature: signature || null,  // [MỚI] relay kèm chữ ký
                 timestamp: newMessage.timestamp
             });
         } catch (err) {

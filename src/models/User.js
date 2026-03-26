@@ -27,23 +27,61 @@ const UserSchema = new mongoose.Schema({
     required: true 
   },
 
-  // 2. Public Key (Công khai cho mọi người để họ gửi tin cho mình) [cite: 59]
+  // 2. Public Key ECDH (Công khai cho mọi người để họ gửi tin cho mình)
   publicKey: { 
     type: String, 
     required: true 
   },
 
-  // 3. Encrypted Private Key (Key Blob) [cite: 56]
-  // Đây là chìa khóa bí mật đã được mã hóa bởi Password của user.
-  // Server lưu giúp, nhưng server không đọc được.
+  // [MỚI] Signing Public Key ECDSA (Công khai để người khác verify chữ ký)
+  signingPublicKey: {
+    type: String,
+    required: true
+  },
+
+  // 3. Encrypted Private Key ECDH (Key Blob)
   encryptedPrivateKey: { 
     type: String, 
     required: true 
   },
-  // Initialization Vector dùng để giải mã Private Key blob trên
   iv: { 
     type: String, 
     required: true 
+  },
+
+  // [MỚI] Encrypted Signing Private Key ECDSA
+  encryptedSigningPrivateKey: {
+    type: String,
+    required: true
+  },
+  signingIv: {
+    type: String,
+    required: true
+  },
+
+  // ── RECOVERY KEY FIELDS ──
+  // recoveryKeyHash: bcrypt hash của recovery key để server verify khi reset
+  recoveryKeyHash: {
+    type: String,
+    required: true
+  },
+  // Private Key ECDH mã hóa bằng recovery key (backup)
+  encryptedPrivateKeyByRecovery: {
+    type: String,
+    required: true
+  },
+  recoveryIv: {
+    type: String,
+    required: true
+  },
+  // Signing Private Key ECDSA mã hóa bằng recovery key (backup)
+  encryptedSigningPrivateKeyByRecovery: {
+    type: String,
+    required: true
+  },
+  recoverySigningIv: {
+    type: String,
+    required: true
   },
 
   createdAt: { 

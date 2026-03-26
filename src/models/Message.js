@@ -25,6 +25,14 @@ const MessageSchema = new mongoose.Schema({
     required: true 
   },
 
+  // Chữ ký số ECDSA của người gửi
+  // Ký trên PLAINTEXT trước khi mã hóa
+  // required: false để không break tin nhắn cũ trong DB chưa có signature
+  signature: {
+    type: String,
+    required: false
+  },
+
   timestamp: { 
     type: Date, 
     default: Date.now 

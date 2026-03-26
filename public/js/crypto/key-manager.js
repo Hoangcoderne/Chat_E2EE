@@ -89,7 +89,9 @@ export async function exportAndEncryptPrivateKey(privateKey, encryptionKey) {
 /**
  * 4. Giải mã Private Key (Key Unwrapping)
  */
-export async function decryptAndImportPrivateKey(encryptedBase64, ivBase64, encryptionKey) {
+// extractable mặc định false (dùng cho login — chỉ cần dùng key, không cần export lại)
+// Truyền true khi cần re-export key (dùng cho reset password flow)
+export async function decryptAndImportPrivateKey(encryptedBase64, ivBase64, encryptionKey, extractable = false) {
     const iv = base64ToArrayBuffer(ivBase64);
     const data = base64ToArrayBuffer(encryptedBase64);
 
@@ -100,7 +102,7 @@ export async function decryptAndImportPrivateKey(encryptedBase64, ivBase64, encr
     );
 
     return await window.crypto.subtle.importKey(
-        "pkcs8", decryptedKeyData, ALG_KEY_GEN, false, ["deriveKey", "deriveBits"]
+        "pkcs8", decryptedKeyData, ALG_KEY_GEN, extractable, ["deriveKey", "deriveBits"]
     );
 }
 
@@ -135,6 +137,134 @@ export async function encryptMessage(text, sharedKey) {
         { name: "AES-GCM", iv: iv }, sharedKey, enc.encode(text)
     );
     return { iv: arrayBufferToBase64(iv), ciphertext: arrayBufferToBase64(ciphertext) };
+}
+
+// ============================================================
+// RECOVERY KEY
+// Recovery key = 32 bytes ngẫu nhiên, entropy cao
+// Import thẳng thành AES-GCM key (không cần PBKDF2 vì đã đủ entropy)
+// Hiển thị cho user dạng: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
+// ============================================================
+
+/**
+ * Tạo Recovery Key ngẫu nhiên 32 bytes
+ * Trả về { raw: Uint8Array, display: string }
+ * display = chuỗi dễ đọc để user lưu lại
+ */
+export function generateRecoveryKey() {
+    const raw = window.crypto.getRandomValues(new Uint8Array(32));
+    // Chuyển sang hex rồi chia thành 8 nhóm 4 ký tự ngăn cách bởi dấu -
+    const hex = Array.from(raw).map(b => b.toString(16).padStart(2, '0')).join('');
+    const display = hex.match(/.{1,8}/g).join('-').toUpperCase();
+    // display ví dụ: "A3F2B1C9-04DE78FA-..."
+    return { raw, display };
+}
+
+/**
+ * Import Recovery Key từ chuỗi display → CryptoKey AES-GCM
+ * Dùng khi reset password: user nhập chuỗi recovery key vào
+ */
+export async function importRecoveryKey(displayKey) {
+    // Bỏ dấu - và chuyển hex về bytes
+    const hex = displayKey.replace(/-/g, '').toLowerCase();
+    if (hex.length !== 64) throw new Error("Recovery key không hợp lệ");
+    const bytes = new Uint8Array(hex.match(/.{2}/g).map(b => parseInt(b, 16)));
+
+    return await window.crypto.subtle.importKey(
+        "raw", bytes,
+        { name: "AES-GCM" },
+        false,
+        ["encrypt", "decrypt"]
+    );
+}
+
+/**
+ * Import Recovery Key từ raw Uint8Array → CryptoKey AES-GCM
+ * Dùng ngay sau khi generate lúc đăng ký
+ */
+export async function importRecoveryKeyFromRaw(rawBytes) {
+    return await window.crypto.subtle.importKey(
+        "raw", rawBytes,
+        { name: "AES-GCM" },
+        false,
+        ["encrypt", "decrypt"]
+    );
+}
+
+// ============================================================
+// DIGITAL SIGNATURE (ECDSA P-256)
+// Keypair riêng biệt với ECDH — Web Crypto không cho dùng chung
+// ============================================================
+
+/**
+ * Tạo cặp khóa ECDSA để ký số
+ * Khác với generateKeyPair() dùng ECDH — cái này dùng ECDSA
+ */
+export async function generateSigningKeyPair() {
+    return await window.crypto.subtle.generateKey(
+        { name: "ECDSA", namedCurve: "P-256" },
+        true, // extractable: true để có thể export lưu lên server
+        ["sign", "verify"]
+    );
+}
+
+/**
+ * Ký tin nhắn bằng signing private key của người gửi
+ * Ký trên PLAINTEXT trước khi mã hóa
+ */
+export async function signMessage(text, signingPrivateKey) {
+    const enc = new TextEncoder();
+    const signature = await window.crypto.subtle.sign(
+        { name: "ECDSA", hash: "SHA-256" },
+        signingPrivateKey,
+        enc.encode(text)
+    );
+    return arrayBufferToBase64(signature);
+}
+
+/**
+ * Verify chữ ký của tin nhắn
+ * Verify trên PLAINTEXT sau khi giải mã
+ * Trả về true/false
+ */
+export async function verifySignature(text, signatureBase64, senderSigningPublicKey) {
+    try {
+        const enc = new TextEncoder();
+        const signatureBuffer = base64ToArrayBuffer(signatureBase64);
+        return await window.crypto.subtle.verify(
+            { name: "ECDSA", hash: "SHA-256" },
+            senderSigningPublicKey,
+            signatureBuffer,
+            enc.encode(text)
+        );
+    } catch (err) {
+        // Nếu signature bị corrupt hoặc format sai → coi như invalid
+        console.error("Verify error:", err);
+        return false;
+    }
+}
+
+/**
+ * Xuất Signing Public Key sang Base64 để lưu server
+ * Dùng "spki" format — chuẩn cho public key
+ */
+export async function exportSigningPublicKey(publicKey) {
+    const exported = await window.crypto.subtle.exportKey("spki", publicKey);
+    return arrayBufferToBase64(exported);
+}
+
+/**
+ * Import Signing Public Key từ Base64 (khi nhận từ server)
+ * Chỉ cần "verify" usage — không cần "sign"
+ */
+export async function importSigningPublicKey(base64Key) {
+    const binary = base64ToArrayBuffer(base64Key);
+    return await window.crypto.subtle.importKey(
+        "spki", binary,
+        { name: "ECDSA", namedCurve: "P-256" },
+        true,
+        ["verify"] // Chỉ verify — public key không sign được
+    );
 }
 
 export async function decryptMessage(encryptedObj, sharedKey) {
