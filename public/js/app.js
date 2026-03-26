@@ -703,6 +703,10 @@ dom.msgInput.addEventListener('keypress', (e) => {
 });
 
 document.addEventListener('click', (e) => {
+    if (e.target.closest('.contact-options-btn') || e.target.closest('.options-menu')) {
+        return;
+    }
+    
     document.querySelectorAll('.options-menu').forEach(el => el.classList.add('hidden'));
     if (!dom.reqPopup.contains(e.target) && e.target !== dom.btnRequests) {
         dom.reqPopup.classList.add('hidden');
