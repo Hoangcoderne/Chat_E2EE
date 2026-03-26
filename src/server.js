@@ -1,23 +1,49 @@
 // src/server.js
 require('dotenv').config();
+
+// ══════════════════════════════════════════════════
+// [MỚI] Kiểm tra biến môi trường bắt buộc ngay khi khởi động
+// Nếu thiếu → dừng hẳn, không để server chạy với config sai
+// ══════════════════════════════════════════════════
+const REQUIRED_ENV = ['MONGO_URI', 'SESSION_SECRET', 'FRONTEND_URL'];
+REQUIRED_ENV.forEach(key => {
+    if (!process.env[key]) {
+        console.error(`[FATAL] Thiếu biến môi trường bắt buộc: ${key}`);
+        console.error('Hãy kiểm tra file .env của bạn.');
+        process.exit(1);
+    }
+});
+
 const express = require('express');
 const http = require('http');
 const path = require('path');
-const cookieParser = require('cookie-parser'); 
+const helmet = require('helmet');           // [MỚI] Security headers
+const cookieParser = require('cookie-parser');
 const connectDB = require('./config/db');
 const { Server } = require('socket.io');
-const app = express();
-const server = http.createServer(app);
+const logger = require('./utils/logger');  // [MỚI] Structured logging
+const requestLogger = require('./middleware/requestLogger'); // [MỚI]
+const { apiLimiter, authLimiter, registerLimiter, resetLimiter } = require('./middleware/rateLimiter'); // [MỚI]
+
 const Message = require('./models/Message');
 const User = require('./models/User');
 const Friendship = require('./models/Friendship');
 const authRoutes = require('./routes/authRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 
+const app = express();
+const server = http.createServer(app);
+
+// ══════════════════════════════════════════════════
+// [MỚI] Trust proxy — bắt buộc khi deploy sau Nginx/Heroku/Render
+// Không có dòng này → rate limit dùng IP sai
+// ══════════════════════════════════════════════════
+app.set('trust proxy', 1);
+
 // Cấu hình Socket.io
 const io = new Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || `http://localhost:${process.env.PORT || 3000}`,
+        origin: process.env.FRONTEND_URL,
         methods: ["GET", "POST"],
         credentials: true
     }
@@ -26,19 +52,74 @@ const io = new Server(server, {
 global.onlineUsers = new Set();
 connectDB();
 
-// Middlewares
+// ══════════════════════════════════════════════════
+// MIDDLEWARES
+// ══════════════════════════════════════════════════
+
+// [MỚI] Helmet: tự động thêm các HTTP security headers
+// Bảo vệ khỏi Clickjacking, XSS, MIME sniffing, v.v.
+app.use(helmet());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser()); 
+app.use(cookieParser());
+
+// [MỚI] Log tất cả HTTP requests
+app.use(requestLogger);
+
+// Static files (public/)
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Routes
+// ══════════════════════════════════════════════════
+// [MỚI] RATE LIMITING
+// Thứ tự quan trọng: specific limiters phải đặt TRƯỚC apiLimiter
+// ══════════════════════════════════════════════════
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', registerLimiter);
+app.use('/api/auth/verify-recovery', resetLimiter);
+app.use('/api/auth/reset-password', resetLimiter);
+app.use('/api/', apiLimiter); // Giới hạn chung cho toàn bộ API
+
+// ══════════════════════════════════════════════════
+// ROUTES
+// ══════════════════════════════════════════════════
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 
-// --- SOCKET.IO EVENTS (Relay Server) ---
+// ══════════════════════════════════════════════════
+// [MỚI] GLOBAL ERROR HANDLER
+// Bắt tất cả lỗi không được xử lý trong các route/middleware
+// ══════════════════════════════════════════════════
+app.use((err, req, res, next) => {
+    logger.error({
+        event: 'unhandled_error',
+        error: err.message,
+        stack: err.stack,
+        method: req.method,
+        path: req.path,
+        userId: req.user?.userId || 'anonymous',
+    });
+    res.status(500).json({ message: 'Lỗi server không xác định.' });
+});
+
+// ══════════════════════════════════════════════════
+// [MỚI] Xử lý Promise bị reject không được catch
+// Ngăn server crash thầm lặng
+// ══════════════════════════════════════════════════
+process.on('unhandledRejection', (reason) => {
+    logger.error({ event: 'unhandled_rejection', error: String(reason) });
+});
+
+process.on('uncaughtException', (err) => {
+    logger.error({ event: 'uncaught_exception', error: err.message, stack: err.stack });
+    process.exit(1); // Crash có kiểm soát — để process manager (PM2) restart lại
+});
+
+// ══════════════════════════════════════════════════
+// SOCKET.IO EVENTS (Relay Server)
+// ══════════════════════════════════════════════════
 io.on('connection', (socket) => {
-    console.log(`Socket connected: ${socket.id}`);
+    logger.info({ event: 'socket_connected', socketId: socket.id });
 
     // 1. User online -> Join room
     socket.on('join_user', async (userId) => {
@@ -67,7 +148,7 @@ io.on('connection', (socket) => {
                 socket.emit('error', 'User không tồn tại');
             }
         } catch (err) {
-            console.error(err);
+            logger.error({ event: 'socket_error', handler: 'request_public_key', error: err.message });
         }
     });
 
@@ -75,7 +156,7 @@ io.on('connection', (socket) => {
     socket.on('send_message', async ({ recipientId, encryptedContent, iv, signature }) => {
         try {
             if (!socket.userId)
-                return socket.emit('error', 'Phiên kết nối bị gián đoạn. Vui lòng nhấn F5 để tải lại trang.');
+                return socket.emit('error', 'Phiên kết nối bị gián đoạn. Vui lòng nhấn F5.');
 
             const senderId = socket.userId;
 
@@ -88,10 +169,10 @@ io.on('connection', (socket) => {
 
             if (!friendship || friendship.status === 'pending') {
                 socket.emit('system_message', {
-                    text: 'Hai bạn chưa phải là bạn bè. Hãy gửi lời mời kết bạn trước.'
+                    text: '⚠️ Hai bạn chưa phải là bạn bè. Hãy gửi lời mời kết bạn trước.'
                 });
                 io.to(recipientId).emit('system_message', {
-                    text: `${socket.username || 'Ai đó'} cố gắng nhắn tin nhưng hai bạn chưa phải bạn bè.`
+                    text: `⚠️ ${socket.username || 'Ai đó'} cố gắng nhắn tin nhưng hai bạn chưa phải bạn bè.`
                 });
                 return;
             }
@@ -118,7 +199,7 @@ io.on('connection', (socket) => {
                 timestamp: newMessage.timestamp
             });
         } catch (err) {
-            console.error("Lỗi gửi tin nhắn:", err);
+            logger.error({ event: 'socket_error', handler: 'send_message', error: err.message });
         }
     });
 
@@ -127,7 +208,7 @@ io.on('connection', (socket) => {
         if (socket.userId) {
             global.onlineUsers.delete(socket.userId);
             socket.broadcast.emit('user_status_change', { userId: socket.userId, status: 'offline' });
-            console.log(`User ${socket.userId} is Offline.`);
+            logger.info({ event: 'user_offline', userId: socket.userId });
         }
     });
 
@@ -135,41 +216,34 @@ io.on('connection', (socket) => {
     socket.on('send_friend_request', async ({ targetUsername }) => {
         try {
             if (!socket.userId)
-                return socket.emit('error', 'Phiên kết nối bị gián đoạn. Vui lòng nhấn F5 để tải lại trang.');
+                return socket.emit('error', 'Phiên kết nối bị gián đoạn. Vui lòng nhấn F5.');
 
             const targetUser = await User.findOne({ username: targetUsername });
-
             if (!targetUser) return socket.emit('error', 'Người dùng không tồn tại');
             if (targetUser._id.toString() === socket.userId) return socket.emit('error', 'Không thể kết bạn với chính mình');
 
-            const existingFriendship = await Friendship.findOne({
+            const existing = await Friendship.findOne({
                 $or: [
                     { requester: socket.userId, recipient: targetUser._id },
                     { requester: targetUser._id, recipient: socket.userId }
                 ]
             });
 
-            if (existingFriendship) {
-                if (existingFriendship.status === 'accepted') return socket.emit('error', 'Hai bạn đã là bạn bè');
-                if (existingFriendship.status === 'pending') return socket.emit('error', 'Đang chờ chấp nhận');
+            if (existing) {
+                if (existing.status === 'accepted') return socket.emit('error', 'Hai bạn đã là bạn bè');
+                if (existing.status === 'pending') return socket.emit('error', 'Đang chờ chấp nhận');
             }
 
-            const newFriendship = new Friendship({
-                requester: socket.userId,
-                recipient: targetUser._id,
-                status: 'pending'
-            });
-            await newFriendship.save();
+            await new Friendship({ requester: socket.userId, recipient: targetUser._id, status: 'pending' }).save();
 
             socket.to(targetUser._id.toString()).emit('receive_friend_request', {
                 fromUser: socket.username,
                 fromId: socket.userId
             });
-
             socket.emit('request_sent_success', `Đã gửi lời mời tới ${targetUsername}`);
 
         } catch (err) {
-            console.error(err);
+            logger.error({ event: 'socket_error', handler: 'send_friend_request', error: err.message });
             socket.emit('error', 'Lỗi server');
         }
     });
@@ -178,13 +252,13 @@ io.on('connection', (socket) => {
     socket.on('accept_friend_request', async ({ requesterId }) => {
         try {
             if (!socket.userId)
-                return socket.emit('error', 'Phiên kết nối bị gián đoạn. Vui lòng nhấn F5 để tải lại trang.');
+                return socket.emit('error', 'Phiên kết nối bị gián đoạn. Vui lòng nhấn F5.');
+
             const friendship = await Friendship.findOneAndUpdate(
                 { requester: requesterId, recipient: socket.userId, status: 'pending' },
                 { status: 'accepted' },
                 { new: true }
             );
-
             if (!friendship) return;
 
             const notifContent = `${socket.username} đã chấp nhận lời mời kết bạn!`;
@@ -199,17 +273,15 @@ io.on('connection', (socket) => {
             });
 
             const requester = await User.findById(requesterId);
-            socket.emit('start_handshake_init', {
-                targetId: requesterId,
-                targetUsername: requester.username
-            });
+            socket.emit('start_handshake_init', { targetId: requesterId, targetUsername: requester.username });
 
+            logger.info({ event: 'friend_accepted', accepter: socket.userId, requester: requesterId });
         } catch (err) {
-            console.error(err);
+            logger.error({ event: 'socket_error', handler: 'accept_friend_request', error: err.message });
         }
     });
 
-    // 7. Xóa thông báo hệ thống
+    // 7. Xóa thông báo
     socket.on('clear_notification', async ({ notifId }) => {
         try {
             if (!notifId || notifId.toString().startsWith('temp_')) return;
@@ -217,17 +289,16 @@ io.on('connection', (socket) => {
                 $pull: { notifications: { _id: notifId } }
             });
         } catch (err) {
-            console.error(err);
+            logger.error({ event: 'socket_error', handler: 'clear_notification', error: err.message });
         }
     });
 
-    // 8. Tín hiệu thông báo bị chặn
+    // 8. Notify block / unblock
     socket.on('notify_block', ({ targetId }) => {
         if (!socket.userId) return;
         socket.to(targetId).emit('you_have_been_blocked', { blockerId: socket.userId });
     });
 
-    // 9. Tín hiệu thông báo được bỏ chặn
     socket.on('notify_unblock', ({ targetId }) => {
         if (!socket.userId) return;
         socket.to(targetId).emit('you_have_been_unblocked', { unblockerId: socket.userId });
@@ -236,5 +307,6 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
+    logger.info({ event: 'server_start', port: PORT, env: process.env.NODE_ENV || 'development' });
     console.log(`>>> SecureChat Server running on http://localhost:${PORT}`);
 });

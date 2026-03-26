@@ -2,26 +2,32 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
+const {
+    loginValidation,
+    registerValidation,
+    verifyRecoveryValidation,
+    resetPasswordValidation,
+} = require('../middleware/validators'); // [MỚI] Input validation
 
-// Đăng ký
-router.post('/register', authController.register);
+// Đăng ký — validate input trước khi xử lý
+router.post('/register', registerValidation, authController.register);
 
-// Lấy Salt
+// Lấy Salt — GET không cần validate body
 router.get('/salt', authController.getSalt);
 
-// Đăng nhập — trả về accessToken (15m) + refreshToken (24h)
-router.post('/login', authController.login);
+// Đăng nhập — validate username + authKeyHash
+router.post('/login', loginValidation, authController.login);
 
-// [MỚI] Cấp lại Access Token bằng Refresh Token
+// Cấp lại Access Token (cookie gửi kèm tự động)
 router.post('/refresh', authController.refreshToken);
 
-// [MỚI] Đăng xuất — thu hồi Refresh Token
+// Đăng xuất — thu hồi Refresh Token trong cookie
 router.post('/logout', authController.logout);
 
-// Verify Recovery Key (quên mật khẩu bước 1)
-router.post('/verify-recovery', authController.verifyRecoveryKey);
+// Verify Recovery Key (bước 1 reset password)
+router.post('/verify-recovery', verifyRecoveryValidation, authController.verifyRecoveryKey);
 
-// Reset Password (quên mật khẩu bước 2)
-router.post('/reset-password', authController.resetPassword);
+// Reset Password (bước 2 reset password)
+router.post('/reset-password', resetPasswordValidation, authController.resetPassword);
 
 module.exports = router;
