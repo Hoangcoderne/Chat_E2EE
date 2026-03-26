@@ -1,16 +1,15 @@
 // public/js/login.js
-import { 
-    deriveKeysFromPassword, 
+import {
+    deriveKeysFromPassword,
     decryptAndImportPrivateKey,
-    base64ToArrayBuffer,
-    importSigningPublicKey   // [MỚI] dùng để import signing private key
+    base64ToArrayBuffer
 } from './crypto/key-manager.js';
 
 const form = document.getElementById('login-form');
 const btnSubmit = document.getElementById('btn-submit');
 const errorMsg = document.getElementById('error-msg');
+const successMsg = document.getElementById('success-msg'); // cần khai báo để dùng trong showSuccess
 
-// Hàm lưu khóa vào IndexedDB — nhận thêm tham số id để lưu nhiều loại key
 async function saveKeyToDB(privateKey, id = 'my-private-key') {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open("SecureChatDB", 1);
@@ -28,10 +27,8 @@ async function saveKeyToDB(privateKey, id = 'my-private-key') {
     });
 }
 
-// [MỚI] Giải mã Signing Private Key ECDSA
-// Khác decryptAndImportPrivateKey ở chỗ import với algorithm ECDSA thay vì ECDH
+// Giải mã Signing Private Key ECDSA (algorithm khác với ECDH)
 async function decryptAndImportSigningKey(encryptedBase64, ivBase64, encryptionKey) {
-    const { base64ToArrayBuffer } = await import('./crypto/key-manager.js');
     const iv = base64ToArrayBuffer(ivBase64);
     const data = base64ToArrayBuffer(encryptedBase64);
 
@@ -41,13 +38,12 @@ async function decryptAndImportSigningKey(encryptedBase64, ivBase64, encryptionK
         data
     );
 
-    // Import với ECDSA — đây là điểm khác với ECDH private key
     return await window.crypto.subtle.importKey(
         "pkcs8",
         decryptedKeyData,
         { name: "ECDSA", namedCurve: "P-256" },
         false,
-        ["sign"] // Signing private key chỉ dùng để sign
+        ["sign"]
     );
 }
 
@@ -62,37 +58,29 @@ form.addEventListener('submit', async (e) => {
         console.log("--- BẮT ĐẦU LOGIN JWT ---");
 
         // BƯỚC 1: Lấy Salt
-        // Lưu ý: Route backend bạn cần đổi login-params thành GET /salt hoặc giữ nguyên logic lấy salt
         const saltRes = await fetch(`/api/auth/salt?username=${username}`);
         if (!saltRes.ok) throw new Error("Tài khoản không tồn tại");
         const { salt } = await saltRes.json();
-        
-        // Salt từ server trả về có thể là Hex hoặc Base64. 
-        // Giả sử server trả Hex (từ controller cũ), ta cần convert.
-        // Nếu server mới trả Base64 thì dùng base64ToArrayBuffer.
-        // Ở đây giả định Salt là Base64 cho khớp với key-manager
-        const saltBuffer = base64ToArrayBuffer(salt); // Nếu lỗi thì kiểm tra lại định dạng Salt backend trả về
 
-        // BƯỚC 2: Derive Keys (Tạo AuthKey và EncryptionKey)
+        const saltBuffer = base64ToArrayBuffer(salt);
+
+        // BƯỚC 2: Derive Keys
         const keys = await deriveKeysFromPassword(password, saltBuffer);
 
-        // BƯỚC 3: Gửi Login (Kèm AuthKey)
+        // BƯỚC 3: Gửi Login
         const loginRes = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                username, 
-                authKeyHash: keys.authKey // Gửi hash lên server so sánh
-            })
+            body: JSON.stringify({ username, authKeyHash: keys.authKey })
         });
 
         const data = await loginRes.json();
         if (!loginRes.ok) throw new Error(data.message || "Đăng nhập thất bại");
 
-        // BƯỚC 4: Lưu cả 2 token
-        console.log("Login OK! Saving Tokens...");
-        localStorage.setItem('accessToken', data.accessToken);   // [SỬA] 15 phút
-        localStorage.setItem('refreshToken', data.refreshToken); // [MỚI] 24 giờ
+        // BƯỚC 4: Lưu Access Token
+        // Chỉ lưu accessToken — refreshToken nằm trong HttpOnly Cookie do server set
+        console.log("Login OK! Saving Access Token...");
+        localStorage.setItem('accessToken', data.accessToken);
         sessionStorage.setItem('userId', data.user.userId);
         sessionStorage.setItem('username', data.user.username);
 
@@ -100,15 +88,13 @@ form.addEventListener('submit', async (e) => {
         console.log("Decrypting Private Key...");
         try {
             const privateKey = await decryptAndImportPrivateKey(
-                data.user.encryptedPrivateKey, 
-                data.user.iv, 
+                data.user.encryptedPrivateKey,
+                data.user.iv,
                 keys.encryptionKey
             );
             await saveKeyToDB(privateKey, 'my-private-key');
 
-            // [MỚI] BƯỚC 5b: Giải mã Signing Private Key ECDSA
-            // Dùng cùng hàm decryptAndImportPrivateKey nhưng key khác
-            // Tuy nhiên cần import với ECDSA algorithm nên dùng hàm riêng
+            // BƯỚC 5b: Giải mã Signing Private Key ECDSA
             const signingPrivateKey = await decryptAndImportSigningKey(
                 data.user.encryptedSigningPrivateKey,
                 data.user.signingIv,
@@ -131,16 +117,18 @@ form.addEventListener('submit', async (e) => {
     }
 });
 
+function showSuccess(msg) {
+    successMsg.innerText = msg;
+    successMsg.style.display = 'block';
+    errorMsg.style.display = 'none'; // Ẩn lỗi nếu có
+}
+
 function showError(msg) {
     errorMsg.innerText = msg;
     errorMsg.style.display = 'block';
-    errorMsg.className = 'alert alert-danger';
+    successMsg.style.display = 'none';
 }
-function showSuccess(msg) {
-    errorMsg.innerText = msg;
-    errorMsg.style.display = 'block';
-    errorMsg.className = 'alert alert-success';
-}
+
 function setLoading(isLoading, text) {
     btnSubmit.disabled = isLoading;
     btnSubmit.innerText = text;

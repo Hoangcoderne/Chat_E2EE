@@ -22,54 +22,113 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
 .msg-received { align-self: flex-start; background: #e4e6eb; color: black; border-bottom-left-radius: 2px; }
 .system-msg { align-self: center; background: none; color: gray; font-size: 0.8em; }
 
-.hidden { display: none; }
+.hidden { display: none !important; }
 
 .contacts-area { flex: 1; overflow-y: auto; margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px; }
 .contacts-list { list-style: none; padding: 0; margin: 0; }
 
-.contact-item { position: relative; display: flex; align-items: center; padding: 10px; cursor: pointer; border-radius: 5px; transition: background 0.2s; }
+/* ── Contact Item ── */
+.contact-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background 0.2s;
+}
 .contact-item:hover { background-color: #e0e0e0; }
-.contact-item.active { background-color: #d1e7dd; } /* Đang chọn */
+.contact-item.active { background-color: #d1e7dd; }
 
-.avatar { width: 35px; height: 35px; background: #0084ff; color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; margin-right: 10px; }
+/* Avatar container: bọc avatar + chấm trạng thái */
+.avatar-container {
+    position: relative;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
 
-.info { display: flex; flex-direction: column; flex: 1; }
-.name { font-weight: 500; }
+.avatar {
+    width: 38px;
+    height: 38px;
+    background: #0084ff;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 1em;
+}
 
-/* Dấu chấm trạng thái */
+/* Đặt chấm trạng thái góc dưới-phải avatar */
+.avatar-container .status-dot {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background-color: #ccc;
+    border: 2px solid #f7f7f7; /* Màu nền sidebar để tạo viền trắng */
+}
+.avatar-container .status-dot.online {
+    background-color: #28a745;
+    box-shadow: 0 0 3px #28a745;
+}
+
+/* Thông tin liên hệ bên phải avatar */
+.contact-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0; /* Quan trọng: cho phép text-overflow hoạt động */
+}
+
+.contact-name {
+    font-weight: 500;
+    font-size: 0.95em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Dòng preview tin nhắn cuối */
+.last-message {
+    font-size: 0.78em;
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+
+/* Dấu chấm trạng thái (dùng độc lập ngoài avatar-container) */
 .status-dot { width: 10px; height: 10px; border-radius: 50%; background-color: #ccc; display: inline-block; margin-top: 2px; }
 .status-dot.online { background-color: #28a745; box-shadow: 0 0 3px #28a745; }
 
 .partner-status {
     font-size: 0.9em;
     font-weight: 500;
-    display: flex;             /* Để căn giữa chấm tròn và chữ */
-    align-items: center;       /* Căn giữa theo chiều dọc */
-    color: #7f8c8d;            /* Màu xám mặc định (Offline) */
+    display: flex;
+    align-items: center;
+    color: #7f8c8d;
 }
 
-/* Vẽ chấm tròn bằng pseudo-element (không cần thêm thẻ div thừa) */
 .partner-status::before {
     content: '';
     display: inline-block;
     width: 12px;
     height: 12px;
-    margin-right: 6px;         /* Khoảng cách giữa chấm và chữ */
-    border-radius: 50%;        /* Bo tròn thành hình tròn */
-    
-    /* Màu xám cho trạng thái Offline */
-    background: #bdc3c7;       
+    margin-right: 6px;
+    border-radius: 50%;
+    background: #bdc3c7;
 }
 
-/* --- TRẠNG THÁI ONLINE --- */
-.partner-status.online {
-    color: #009933;            /* Chữ màu xanh lá đậm đà */
-}
+.partner-status.online { color: #009933; }
 
 .partner-status.online::before {
-    /* Tạo hiệu ứng quả cầu 3D màu xanh ngọc giống ảnh */
     background: radial-gradient(circle at 30% 30%, #5cd65c, #009933);
-    box-shadow: 0 0 4px rgba(0, 153, 51, 0.4); /* Thêm chút ánh sáng tỏa ra */
+    box-shadow: 0 0 4px rgba(0, 153, 51, 0.4);
 }
 
 .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
@@ -89,8 +148,6 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     border-radius: 8px;
     padding: 10px;
     z-index: 1000;
-    
-    /* Scrollable */
     max-height: 300px;
     overflow-y: auto;
 }
@@ -102,37 +159,34 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
 .btn-accept { background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
 .btn-accept:hover { background: #218838; }
 
-.hidden { display: none; }
-
-/* public/styles/main.css */
-
+/* My Profile */
 .my-profile {
-    display: flex;              /* Kích hoạt Flexbox */
-    justify-content: space-between; /* Đẩy tên sang trái, nút sang phải */
-    align-items: center;        /* Căn giữa theo chiều dọc */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     padding-bottom: 15px;
-    border-bottom: 2px solid #eee; /* Đường kẻ dưới nhẹ nhàng */
+    border-bottom: 2px solid #eee;
     margin-bottom: 15px;
 }
 
 .user-name {
-    margin: 0;                 /* Bỏ margin thừa của thẻ h3 */
+    margin: 0;
     font-size: 1.1em;
-    white-space: nowrap;       /* Không xuống dòng tên */
+    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;   /* Nếu tên dài quá thì hiện dấu ... */
-    max-width: 140px;          /* Giới hạn chiều rộng tên */
+    text-overflow: ellipsis;
+    max-width: 140px;
 }
 
 .profile-actions {
     display: flex;
     align-items: center;
-    gap: 10px;                 /* Khoảng cách giữa Chuông và nút Đăng xuất */
+    gap: 10px;
 }
 
 /* Tinh chỉnh nút Đăng xuất cho đẹp hơn */
 .small-btn {
-    background-color: #ff4d4d; /* Màu đỏ nhẹ */
+    background-color: #ff4d4d;
     color: white;
     border: none;
     padding: 5px 10px;
@@ -142,16 +196,14 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 30px;              /* Chiều cao bằng với icon chuông */
+    height: 30px;
 }
 
-.small-btn:hover {
-    background-color: #cc0000;
-}
+.small-btn:hover { background-color: #cc0000; }
 
 /* Tinh chỉnh nút Chuông để icon to rõ hơn chút */
 .icon-btn {
-    font-size: 1.3em; 
+    font-size: 1.3em;
     padding: 0;
     display: flex;
     align-items: center;
@@ -165,12 +217,10 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     font-size: 1.2em;
     padding: 0 5px;
     cursor: pointer;
-    display: none; /* Mặc định ẩn, hover mới hiện */
+    display: none;
 }
 
-.contact-item:hover .contact-options-btn {
-    display: block;
-}
+.contact-item:hover .contact-options-btn { display: block; }
 
 /* Menu Dropdown */
 .options-menu {
@@ -196,16 +246,10 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     font-size: 0.9em;
 }
 
-.options-menu button:hover {
-    background-color: #f0f0f0;
-}
+.options-menu button:hover { background-color: #f0f0f0; }
+.options-menu button.danger { color: red; }
 
-.options-menu button.danger {
-    color: red;
-}
-
-.hidden { display: none !important; }
-
+/* Block Overlay */
 .block-overlay {
     background-color: #242526;
     color: #e4e6eb;
@@ -216,21 +260,11 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    /* Chiếm vị trí của chat-input-area */
-    min-height: 80px; 
+    min-height: 80px;
 }
 
-.block-overlay h4 {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-}
-
-.block-overlay p {
-    margin: 0;
-    font-size: 14px;
-    color: #b0b3b8;
-}
+.block-overlay h4 { margin: 0; font-size: 16px; font-weight: 600; }
+.block-overlay p { margin: 0; font-size: 14px; color: #b0b3b8; }
 
 .block-btn {
     background-color: #3a3b3c;
@@ -247,6 +281,4 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     transition: background-color 0.2s;
 }
 
-.block-btn:hover {
-    background-color: #4e4f50;
-}
+.block-btn:hover { background-color: #4e4f50; }

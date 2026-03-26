@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const cookieParser = require('cookie-parser'); 
 const connectDB = require('./config/db');
 const { Server } = require('socket.io');
 const app = express();
@@ -16,8 +17,9 @@ const chatRoutes = require('./routes/chatRoutes');
 // Cấu hình Socket.io
 const io = new Server(server, {
     cors: {
-        origin: "*", 
-        methods: ["GET", "POST"]
+        origin: process.env.FRONTEND_URL || `http://localhost:${process.env.PORT || 3000}`,
+        methods: ["GET", "POST"],
+        credentials: true
     }
 });
 
@@ -25,8 +27,9 @@ global.onlineUsers = new Set();
 connectDB();
 
 // Middlewares
-app.use(express.json()); 
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser()); 
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Routes
@@ -40,12 +43,12 @@ io.on('connection', (socket) => {
     // 1. User online -> Join room
     socket.on('join_user', async (userId) => {
         socket.join(userId);
-        socket.userId = userId; 
+        socket.userId = userId;
         global.onlineUsers.add(userId);
-        
+
         const user = await User.findById(userId);
-        if(user) socket.username = user.username; 
-        
+        if (user) socket.username = user.username;
+
         socket.broadcast.emit('user_status_change', { userId, status: 'online' });
     });
 
@@ -57,7 +60,7 @@ io.on('connection', (socket) => {
                 socket.emit('response_public_key', {
                     userId: user._id.toString(),
                     publicKey: user.publicKey,
-                    signingPublicKey: user.signingPublicKey, // [MỚI] gửi kèm để client verify
+                    signingPublicKey: user.signingPublicKey,
                     username: user.username
                 });
             } else {
@@ -71,7 +74,7 @@ io.on('connection', (socket) => {
     // 3. Chuyển tiếp tin nhắn E2EE
     socket.on('send_message', async ({ recipientId, encryptedContent, iv, signature }) => {
         try {
-            if (!socket.userId) 
+            if (!socket.userId)
                 return socket.emit('error', 'Phiên kết nối bị gián đoạn. Vui lòng nhấn F5 để tải lại trang.');
 
             const senderId = socket.userId;
@@ -84,11 +87,11 @@ io.on('connection', (socket) => {
             });
 
             if (!friendship || friendship.status === 'pending') {
-                socket.emit('system_message', { 
-                    text: '⚠️ Hai bạn chưa phải là bạn bè. Hãy gửi lời mời kết bạn trước.'
+                socket.emit('system_message', {
+                    text: 'Hai bạn chưa phải là bạn bè. Hãy gửi lời mời kết bạn trước.'
                 });
                 io.to(recipientId).emit('system_message', {
-                    text: `⚠️ ${socket.username || 'Ai đó'} cố gắng nhắn tin nhưng hai bạn chưa phải bạn bè.`
+                    text: `${socket.username || 'Ai đó'} cố gắng nhắn tin nhưng hai bạn chưa phải bạn bè.`
                 });
                 return;
             }
@@ -103,7 +106,7 @@ io.on('connection', (socket) => {
                 recipient: recipientId,
                 encryptedContent,
                 iv,
-                signature: signature || null  // [MỚI] lưu chữ ký nếu có
+                signature: signature || null
             });
             await newMessage.save();
 
@@ -111,7 +114,7 @@ io.on('connection', (socket) => {
                 senderId,
                 encryptedContent,
                 iv,
-                signature: signature || null,  // [MỚI] relay kèm chữ ký
+                signature: signature || null,
                 timestamp: newMessage.timestamp
             });
         } catch (err) {
@@ -131,11 +134,11 @@ io.on('connection', (socket) => {
     // 5. Gửi lời mời kết bạn
     socket.on('send_friend_request', async ({ targetUsername }) => {
         try {
-            if (!socket.userId) 
+            if (!socket.userId)
                 return socket.emit('error', 'Phiên kết nối bị gián đoạn. Vui lòng nhấn F5 để tải lại trang.');
-    
+
             const targetUser = await User.findOne({ username: targetUsername });
-            
+
             if (!targetUser) return socket.emit('error', 'Người dùng không tồn tại');
             if (targetUser._id.toString() === socket.userId) return socket.emit('error', 'Không thể kết bạn với chính mình');
 
@@ -162,7 +165,7 @@ io.on('connection', (socket) => {
                 fromUser: socket.username,
                 fromId: socket.userId
             });
-            
+
             socket.emit('request_sent_success', `Đã gửi lời mời tới ${targetUsername}`);
 
         } catch (err) {
@@ -174,7 +177,7 @@ io.on('connection', (socket) => {
     // 6. Chấp nhận kết bạn
     socket.on('accept_friend_request', async ({ requesterId }) => {
         try {
-            if (!socket.userId) 
+            if (!socket.userId)
                 return socket.emit('error', 'Phiên kết nối bị gián đoạn. Vui lòng nhấn F5 để tải lại trang.');
             const friendship = await Friendship.findOneAndUpdate(
                 { requester: requesterId, recipient: socket.userId, status: 'pending' },
@@ -194,9 +197,9 @@ io.on('connection', (socket) => {
                 accepterName: socket.username,
                 notification: { content: notifContent }
             });
-            
+
             const requester = await User.findById(requesterId);
-            socket.emit('start_handshake_init', { 
+            socket.emit('start_handshake_init', {
                 targetId: requesterId,
                 targetUsername: requester.username
             });
@@ -205,11 +208,10 @@ io.on('connection', (socket) => {
             console.error(err);
         }
     });
-    
+
     // 7. Xóa thông báo hệ thống
     socket.on('clear_notification', async ({ notifId }) => {
         try {
-            // [FIX] ID giả (temp_...) chỉ tồn tại trong RAM client, không có trong DB -> bỏ qua
             if (!notifId || notifId.toString().startsWith('temp_')) return;
             await User.findByIdAndUpdate(socket.userId, {
                 $pull: { notifications: { _id: notifId } }
@@ -219,20 +221,16 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 8. Tín hiệu thông báo bị chặn (Real-time Block)
+    // 8. Tín hiệu thông báo bị chặn
     socket.on('notify_block', ({ targetId }) => {
         if (!socket.userId) return;
-        socket.to(targetId).emit('you_have_been_blocked', {
-            blockerId: socket.userId
-        });
+        socket.to(targetId).emit('you_have_been_blocked', { blockerId: socket.userId });
     });
 
-    // 9. Tín hiệu thông báo được bỏ chặn (Real-time Unblock)
+    // 9. Tín hiệu thông báo được bỏ chặn
     socket.on('notify_unblock', ({ targetId }) => {
         if (!socket.userId) return;
-        socket.to(targetId).emit('you_have_been_unblocked', {
-            unblockerId: socket.userId
-        });
+        socket.to(targetId).emit('you_have_been_unblocked', { unblockerId: socket.userId });
     });
 });
 

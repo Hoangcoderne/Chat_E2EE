@@ -1,7 +1,7 @@
 // public/js/app.js
-import { 
+import {
     importPublicKey, deriveSharedSecret, encryptMessage, decryptMessage,
-    signMessage, verifySignature, importSigningPublicKey  // [MỚI]
+    signMessage, verifySignature, importSigningPublicKey
 } from './crypto/key-manager.js';
 
 // ============================================================
@@ -9,20 +9,19 @@ import {
 // ============================================================
 const socket = io();
 
-// State
 let friendRequests = [];
 let notifications = [];
 let myIdentity = {
     userId: null,
     username: null,
     privateKey: null,
-    signingPrivateKey: null  // [MỚI]
+    signingPrivateKey: null
 };
 let currentChat = {
     partnerId: null,
     partnerPublicKey: null,
-    partnerSigningPublicKey: null,  // [MỚI] Để verify tin nhắn đến
-    sharedSecret: null 
+    partnerSigningPublicKey: null,
+    sharedSecret: null
 };
 
 // DOM Elements
@@ -61,12 +60,7 @@ socket.on('connect', () => {
 // 2. HELPER FUNCTIONS (AUTH & DB)
 // ============================================================
 
-// [SỬA] authFetch tự động refresh access token khi hết hạn
-// Nếu nhận 401 + code TOKEN_EXPIRED:
-//   → Gọi /api/auth/refresh với refreshToken
-//   → Lưu accessToken mới
-//   → Retry request gốc 1 lần
-// Nếu nhận 401 + code TOKEN_INVALID hoặc refresh thất bại → logout
+// authFetch tự động refresh access token khi hết hạn
 async function authFetch(url, options = {}, _isRetry = false) {
     const token = localStorage.getItem('accessToken');
 
@@ -81,12 +75,9 @@ async function authFetch(url, options = {}, _isRetry = false) {
     if (res.status === 401) {
         const data = await res.json().catch(() => ({}));
 
-        // Token hết hạn và chưa retry lần nào → thử refresh
         if (data.code === 'TOKEN_EXPIRED' && !_isRetry) {
             const refreshed = await tryRefreshToken();
             if (refreshed) {
-                // Retry request gốc với access token mới
-                // Tạo options mới để không dùng token cũ
                 const retryOptions = { ...options };
                 retryOptions.headers = { ...options.headers };
                 retryOptions.headers['Authorization'] = `Bearer ${localStorage.getItem('accessToken')}`;
@@ -94,7 +85,6 @@ async function authFetch(url, options = {}, _isRetry = false) {
             }
         }
 
-        // Không refresh được hoặc token giả → logout
         alert("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
         logout();
         return null;
@@ -102,22 +92,17 @@ async function authFetch(url, options = {}, _isRetry = false) {
     return res;
 }
 
-// [MỚI] Gọi /api/auth/refresh để lấy access token mới
 async function tryRefreshToken() {
     try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) return false;
-
         const res = await fetch('/api/auth/refresh', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refreshToken })
+            headers: { 'Content-Type': 'application/json' }
+            // Cookie tự động được gửi kèm bởi browser
         });
 
         if (!res.ok) return false;
 
         const data = await res.json();
-        // Lưu access token mới
         localStorage.setItem('accessToken', data.accessToken);
         return true;
 
@@ -127,7 +112,6 @@ async function tryRefreshToken() {
     }
 }
 
-// Hàm đọc khóa từ IndexedDB theo id
 function loadKeyFromDB(id = 'my-private-key') {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open("SecureChatDB", 1);
@@ -145,18 +129,12 @@ function loadKeyFromDB(id = 'my-private-key') {
 
 async function logout() {
     try {
-        // [MỚI] Thu hồi refresh token trên server trước khi xóa local
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (refreshToken) {
-            // fire-and-forget — không cần chờ response
-            fetch('/api/auth/logout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refreshToken })
-            }).catch(() => {}); // Bỏ qua lỗi network lúc logout
-        }
+        // Server đọc từ HttpOnly cookie và tự xóa cookie đó
+        fetch('/api/auth/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        }).catch(() => {});
     } finally {
-        // Xóa key khỏi IndexedDB
         try {
             const req = indexedDB.open("SecureChatDB", 1);
             req.onsuccess = (e) => {
@@ -167,8 +145,8 @@ async function logout() {
         } catch (e) {}
 
         sessionStorage.clear();
-        localStorage.removeItem('accessToken');  // [SỬA]
-        localStorage.removeItem('refreshToken'); // [MỚI]
+        localStorage.removeItem('accessToken');
+        // [FIX #5] Không còn refreshToken trong localStorage để xóa
         window.location.href = '/login.html';
     }
 }
@@ -178,40 +156,34 @@ async function logout() {
 // ============================================================
 
 async function initApp() {
-    // Kiểm tra Token và Session
-    const token = localStorage.getItem('accessToken'); // [SỬA] đổi key
+    const token = localStorage.getItem('accessToken');
     const userId = sessionStorage.getItem('userId');
     const username = sessionStorage.getItem('username');
-    
+
     if (!token || !userId || !username) {
         window.location.href = '/login.html';
         return;
     }
 
     try {
-        // Load Private Key ECDH
         const privateKey = await loadKeyFromDB('my-private-key');
         if (!privateKey) throw new Error("Không tìm thấy Private Key");
 
-        // [MỚI] Load Signing Private Key ECDSA
         const signingPrivateKey = await loadKeyFromDB('my-signing-key');
         if (!signingPrivateKey) throw new Error("Không tìm thấy Signing Key");
-        
-        // Lưu State
+
         myIdentity = { userId, username, privateKey, signingPrivateKey };
         dom.myUsername.innerText = username;
-        
-        // Kết nối Socket
+
         socket.emit('join_user', userId);
         dom.status.innerText = "🟢 Online";
         dom.status.style.color = "green";
 
-        // Load dữ liệu ban đầu
         await loadContacts();
         await loadFriendRequests();
         await loadNotifications();
 
-        console.log("✅ App Initialized. Ready to E2EE.");
+        console.log("App Initialized. Ready to E2EE.");
 
     } catch (err) {
         console.error(err);
@@ -227,39 +199,35 @@ async function initApp() {
 // A. Handshake: Nhận Public Key -> Tạo Shared Secret
 socket.on('response_public_key', async (data) => {
     try {
-        const { userId, publicKey, username, signingPublicKey } = data; // [MỚI] nhận thêm signingPublicKey
-        console.log("🔑 Handshake: Received key from", username);
+        const { userId, publicKey, username, signingPublicKey } = data;
+        console.log("Handshake: Received key from", username);
 
         const partnerKeyObj = await importPublicKey(publicKey);
         const sharedKey = await deriveSharedSecret(myIdentity.privateKey, partnerKeyObj);
 
-        // [MỚI] Import signing public key để verify tin nhắn đến
-        const partnerSigningKey = signingPublicKey 
+        const partnerSigningKey = signingPublicKey
             ? await importSigningPublicKey(signingPublicKey)
             : null;
 
         currentChat = {
             partnerId: userId,
             partnerPublicKey: partnerKeyObj,
-            partnerSigningPublicKey: partnerSigningKey, // [MỚI]
+            partnerSigningPublicKey: partnerSigningKey,
             sharedSecret: sharedKey
         };
 
-        // UI Updates
         updateHeaderStatus(userId);
         dom.chatHeader.classList.remove('hidden');
         dom.partnerName.innerText = username || dom.searchInput.value;
         dom.msgInput.disabled = false;
         dom.btnSend.disabled = false;
         dom.messagesList.innerHTML = `<div class="system-msg">🔒 Đã thiết lập kênh E2EE.</div>`;
-        
-        // Highlight Sidebar
+
         document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
         const item = document.querySelector(`.contact-item[data-id="${userId}"]`);
-        if(item) item.classList.add('active');
+        if (item) item.classList.add('active');
 
-        // Load History
-        await loadChatHistory(); 
+        await loadChatHistory();
 
     } catch (err) {
         console.error("Lỗi Handshake:", err);
@@ -277,8 +245,7 @@ socket.on('receive_message', async (payload) => {
             currentChat.sharedSecret
         );
 
-        // [MỚI] Verify chữ ký sau khi giải mã
-        let signatureValid = null; // null = không có signature (tin nhắn cũ)
+        let signatureValid = null;
         if (payload.signature && currentChat.partnerSigningPublicKey) {
             signatureValid = await verifySignature(
                 decryptedText,
@@ -290,7 +257,7 @@ socket.on('receive_message', async (payload) => {
         appendMessage(decryptedText, 'received', signatureValid);
     } catch (err) {
         console.error("Decryption failed:", err);
-        appendMessage("⚠️ [Lỗi giải mã]", 'received', false);
+        appendMessage("[Lỗi giải mã]", 'received', false);
     }
 });
 
@@ -307,33 +274,29 @@ socket.on('user_status_change', (data) => {
 socket.on('receive_friend_request', (data) => {
     friendRequests.push(data);
     updateRequestUI();
-    // Có thể thêm âm thanh thông báo tại đây
 });
 
 // E. Được chấp nhận kết bạn
 socket.on('request_accepted', (data) => {
     console.log(`${data.accepterName} đã chấp nhận!`);
     if (data.notification) {
-        // Tạo ID giả để UI không lỗi khi chưa reload
         data.notification._id = 'temp_' + Date.now();
         notifications.unshift(data.notification);
         updateRequestUI();
     }
-    renderContactItem({ 
-        _id: data.accepterId, 
-        username: data.accepterName, 
-        online: true // Chắc chắn họ đang online vì họ vừa bấm "Chấp nhận" xong
+    renderContactItem({
+        _id: data.accepterId,
+        username: data.accepterName,
+        online: true
     });
     startHandshake(data.accepterName);
 });
 
-// F. Tín hiệu bắt đầu Handshake (Khi mình chấp nhận người khác)
+// F. Tín hiệu bắt đầu Handshake
 socket.on('start_handshake_init', (data) => {
     console.log("Start Handshake Init...");
-    // Vẽ ngay contact lên sidebar
     renderContactItem({ _id: data.targetId, username: data.targetUsername, online: true });
-    
-    // Tự động click vào để chat
+
     const item = document.querySelector(`.contact-item[data-id="${data.targetId}"]`);
     if (item) {
         item.click();
@@ -341,33 +304,34 @@ socket.on('start_handshake_init', (data) => {
     }
 });
 
-// G. Người khác chặn mình -> Tự động chuyển màn hình
+// G. Người khác chặn mình
 socket.on('you_have_been_blocked', ({ blockerId }) => {
     const li = document.querySelector(`.contact-item[data-id="${blockerId}"]`);
     if (li) {
-        // Cập nhật dataset: status là bị chặn, nhưng mình KHÔNG phải là người chủ động chặn
         li.dataset.status = 'blocked';
         li.dataset.isBlocker = 'false';
-        
-        // Nếu mình ĐANG MỞ khung chat với người đó thì ép tải lại UI để hiện khung đen ngay lập tức
-        if (currentChat.partnerId === blockerId) {
-            li.click();
-        }
+        if (currentChat.partnerId === blockerId) li.click();
     }
 });
 
-// H. Người khác bỏ chặn mình -> Tự động mở lại khung chat
+// H. Người khác bỏ chặn mình
 socket.on('you_have_been_unblocked', ({ unblockerId }) => {
     const li = document.querySelector(`.contact-item[data-id="${unblockerId}"]`);
     if (li) {
         li.dataset.status = 'accepted';
         li.dataset.isBlocker = 'false';
-        
-        // Nếu đang mở khung chat thì tự động Handshake lại để chat tiếp
-        if (currentChat.partnerId === unblockerId) {
-            li.click();
-        }
+        if (currentChat.partnerId === unblockerId) li.click();
     }
+});
+
+// [FIX #1] Thêm handler cho system_message — trước đây server emit nhưng client không bắt
+socket.on('system_message', ({ text }) => {
+    appendMessage(text, 'system');
+});
+
+// [FIX #1] Thêm handler cho request_sent_success
+socket.on('request_sent_success', (msg) => {
+    appendMessage(msg, 'system');
 });
 
 socket.on('error', (msg) => alert(msg));
@@ -376,22 +340,19 @@ socket.on('error', (msg) => alert(msg));
 // 5. API CALLS (DATA LOADING)
 // ============================================================
 
-// Tải danh sách bạn bè
 async function loadContacts() {
     try {
-        // [QUAN TRỌNG] Dùng authFetch thay vì fetch thường
         const res = await authFetch(`/api/chat/contacts`);
-        if(!res) return;
-        
+        if (!res) return;
+
         const contacts = await res.json();
-        dom.contactsList.innerHTML = ''; 
+        dom.contactsList.innerHTML = '';
         contacts.forEach(user => renderContactItem(user));
     } catch (err) {
         console.error("Lỗi tải contacts:", err);
     }
 }
 
-// Tải lịch sử chat
 async function loadChatHistory() {
     const { userId } = myIdentity;
     const { partnerId, sharedSecret } = currentChat;
@@ -399,7 +360,7 @@ async function loadChatHistory() {
 
     try {
         const res = await authFetch(`/api/chat/history/${partnerId}`);
-        if(!res) return;
+        if (!res) return;
 
         const messages = await res.json();
         dom.messagesList.innerHTML = '';
@@ -415,9 +376,9 @@ async function loadChatHistory() {
                     { ciphertext: msg.encryptedContent, iv: msg.iv },
                     sharedSecret
                 );
-                const type = (msg.sender === userId) ? 'sent' : 'received';
+                // [FIX] .toString() để tránh lỗi so sánh ObjectId với string
+                const type = (msg.sender.toString() === userId) ? 'sent' : 'received';
 
-                // [MỚI] Verify chữ ký cho tin nhắn nhận về trong history
                 let signatureValid = null;
                 if (msg.signature && type === 'received' && currentChat.partnerSigningPublicKey) {
                     signatureValid = await verifySignature(
@@ -438,12 +399,11 @@ async function loadChatHistory() {
     }
 }
 
-// Tải lời mời kết bạn
 async function loadFriendRequests() {
     try {
         const res = await authFetch(`/api/chat/requests`);
-        if(!res) return;
-        
+        if (!res) return;
+
         const data = await res.json();
         if (Array.isArray(data)) {
             friendRequests = data;
@@ -452,11 +412,10 @@ async function loadFriendRequests() {
     } catch (err) { console.error(err); }
 }
 
-// Tải thông báo
 async function loadNotifications() {
     try {
         const res = await authFetch(`/api/chat/notifications`);
-        if(!res) return;
+        if (!res) return;
 
         notifications = await res.json();
         updateRequestUI();
@@ -467,7 +426,6 @@ async function loadNotifications() {
 // 6. UI RENDERING & INTERACTIONS
 // ============================================================
 
-// Vẽ 1 dòng liên hệ vào Sidebar
 function renderContactItem(user) {
     if (document.querySelector(`.contact-item[data-id="${user._id}"]`)) return;
 
@@ -475,10 +433,10 @@ function renderContactItem(user) {
     li.className = 'contact-item';
     li.dataset.id = user._id;
     li.dataset.username = user.username;
-    const onlineClass = user.online ? 'online' : '';
+    li.dataset.status = user.status || 'accepted';
+    li.dataset.isBlocker = user.isBlocker || false;
 
-    li.dataset.status = user.status; 
-    li.dataset.isBlocker = user.isBlocker;
+    const onlineClass = user.online ? 'online' : '';
 
     li.innerHTML = `
         <div class="avatar-container">
@@ -498,13 +456,12 @@ function renderContactItem(user) {
 
     li.addEventListener('click', (e) => {
         if (e.target.closest('.contact-options-btn') || e.target.closest('.options-menu')) return;
-        
+
         document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
         li.classList.add('active');
 
         dom.searchInput.value = user.username;
-        
-        // KIỂM TRA TRẠNG THÁI CHẶN TRƯỚC KHI HANDSHAKE
+
         const status = li.dataset.status;
         const isBlocker = li.dataset.isBlocker === 'true';
 
@@ -514,17 +471,16 @@ function renderContactItem(user) {
             dom.chatHeader.classList.remove('hidden');
             dom.partnerName.innerText = user.username;
             dom.messagesList.innerHTML = `<div class="system-msg">Không thể lấy khóa E2EE do cuộc trò chuyện đã bị chặn.</div>`;
-            
+
             if (isBlocker) {
                 dom.blockTitle.innerText = `Bạn đã chặn tin nhắn từ ${user.username}`;
                 dom.btnUnblock.classList.remove('hidden');
-                dom.btnUnblock.onclick = () => handleUnblock(user._id); // Gắn sự kiện mở chặn
+                dom.btnUnblock.onclick = () => handleUnblock(user._id);
             } else {
                 dom.blockTitle.innerText = `Bạn không thể trả lời cuộc trò chuyện này`;
-                dom.btnUnblock.classList.add('hidden'); // Ẩn nút nếu là người bị chặn
+                dom.btnUnblock.classList.add('hidden');
             }
         } else {
-            // Nếu bình thường thì hiện ô nhập tin nhắn và Handshake
             dom.chatInputArea.classList.remove('hidden');
             dom.blockOverlay.classList.add('hidden');
             startHandshake(user.username);
@@ -534,7 +490,6 @@ function renderContactItem(user) {
     dom.contactsList.appendChild(li);
 }
 
-// Cập nhật Popup Thông báo
 function updateRequestUI() {
     if (!friendRequests) friendRequests = [];
     if (!notifications) notifications = [];
@@ -551,7 +506,6 @@ function updateRequestUI() {
 
     dom.reqList.innerHTML = '';
 
-    // Vẽ Lời mời
     friendRequests.forEach(req => {
         const li = document.createElement('li');
         li.className = 'req-item';
@@ -567,7 +521,6 @@ function updateRequestUI() {
         dom.reqList.appendChild(li);
     });
 
-    // Vẽ Thông báo
     notifications.forEach(notif => {
         const li = document.createElement('li');
         li.className = 'notif-item';
@@ -586,16 +539,10 @@ function updateRequestUI() {
     });
 }
 
-// Vẽ tin nhắn
-// [SỬA] Thêm tham số signatureValid:
-//   null  = không có chữ ký (tin nhắn cũ) hoặc tin mình gửi → hiện bình thường
-//   true  = verify thành công → im lặng, không làm gì thêm
-//   false = verify thất bại → hiện cảnh báo đỏ, ẩn nội dung
 function appendMessage(text, type, signatureValid = null) {
     const div = document.createElement('div');
 
     if (signatureValid === false) {
-        // Verify thất bại → hiện cảnh báo, KHÔNG hiện nội dung tin nhắn
         div.classList.add('message', 'msg-received');
         div.style.cssText = `
             background: #fff0f0;
@@ -613,8 +560,7 @@ function appendMessage(text, type, signatureValid = null) {
             </div>
         `;
     } else {
-        // Verify thành công hoặc không có chữ ký → hiện bình thường, im lặng
-        div.classList.add('message', type === 'sent' ? 'msg-sent' : 
+        div.classList.add('message', type === 'sent' ? 'msg-sent' :
                           type === 'system' ? 'system-msg' : 'msg-received');
         div.innerText = text;
     }
@@ -639,35 +585,27 @@ function updateHeaderStatus(userId) {
 // 7. USER ACTIONS & EVENT HANDLERS
 // ============================================================
 
-// Bắt đầu Handshake
 function startHandshake(targetUsername) {
     if (!targetUsername) return;
     if (targetUsername === myIdentity.username) return alert("Không thể chat với mình");
     socket.emit('request_public_key', { username: targetUsername });
 }
 
-// Gửi tin nhắn
 async function sendMessage() {
     const text = dom.msgInput.value.trim();
     if (!text || !currentChat.sharedSecret) return;
 
     try {
-        // [MỚI] BƯỚC 1: Ký plaintext trước khi mã hóa
         const signature = await signMessage(text, myIdentity.signingPrivateKey);
-
-        // BƯỚC 2: Mã hóa như cũ
         const encryptedData = await encryptMessage(text, currentChat.sharedSecret);
 
-        // [BẢO MẬT] Không gửi senderId — server lấy từ socket.userId
-        const payload = {
+        socket.emit('send_message', {
             recipientId: currentChat.partnerId,
             encryptedContent: encryptedData.ciphertext,
             iv: encryptedData.iv,
-            signature  // [MỚI]
-        };
-        socket.emit('send_message', payload);
+            signature
+        });
 
-        // Tin mình gửi → không verify, signatureValid = null
         appendMessage(text, 'sent', null);
         dom.msgInput.value = '';
     } catch (err) {
@@ -676,7 +614,7 @@ async function sendMessage() {
     }
 }
 
-// --- GLOBAL HANDLERS (Gắn vào window để gọi từ HTML) ---
+// --- GLOBAL HANDLERS ---
 
 window.toggleMenu = function(e, id) {
     e.stopPropagation();
@@ -690,12 +628,11 @@ window.handleUnfriend = async function(e, targetId) {
     if (!confirm("Bạn chắc chắn muốn hủy kết bạn?")) return;
 
     try {
-        // [QUAN TRỌNG] Dùng authFetch để có Token
         const res = await authFetch('/api/chat/unfriend', {
             method: 'POST',
             body: JSON.stringify({ targetId })
         });
-        if(!res) return;
+        if (!res) return;
 
         const data = await res.json();
         if (data.success) {
@@ -717,23 +654,17 @@ window.handleBlock = async function(e, targetId) {
             method: 'POST',
             body: JSON.stringify({ targetId })
         });
-        if(!res) return;
+        if (!res) return;
 
         const data = await res.json();
         if (data.success) {
-            // 1. Báo cho Server biết để đẩy giao diện chặn sang người kia
             socket.emit('notify_block', { targetId });
 
-            // 2. Cập nhật UI của chính mình (Không reload trang nữa)
             const li = document.querySelector(`.contact-item[data-id="${targetId}"]`);
             if (li) {
                 li.dataset.status = 'blocked';
                 li.dataset.isBlocker = 'true';
-                
-                // Ẩn menu 3 chấm đi sau khi đã chặn
                 document.querySelectorAll('.options-menu').forEach(el => el.classList.add('hidden'));
-                
-                // Ép click vào người này để giao diện chat chuyển sang màu đen (Overlay)
                 li.click();
             }
         }
@@ -746,19 +677,17 @@ window.handleUnblock = async function(targetId) {
             method: 'POST',
             body: JSON.stringify({ targetId })
         });
-        if(!res) return;
+        if (!res) return;
 
         const data = await res.json();
         if (data.success) {
-            // 1. Báo cho người kia biết đã được mở chặn
             socket.emit('notify_unblock', { targetId });
-            
-            // 2. Cập nhật UI của mình
+
             const li = document.querySelector(`.contact-item[data-id="${targetId}"]`);
-            if(li) {
+            if (li) {
                 li.dataset.status = 'accepted';
                 li.dataset.isBlocker = 'false';
-                li.click(); // Load lại luồng Handshake chat bình thường
+                li.click();
             }
         }
     } catch (err) { console.error(err); }
@@ -773,12 +702,8 @@ dom.msgInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage();
 });
 
-// Click ra ngoài thì đóng popup/menu
 document.addEventListener('click', (e) => {
-    // Đóng menu 3 chấm
     document.querySelectorAll('.options-menu').forEach(el => el.classList.add('hidden'));
-    
-    // Đóng popup thông báo
     if (!dom.reqPopup.contains(e.target) && e.target !== dom.btnRequests) {
         dom.reqPopup.classList.add('hidden');
     }
@@ -792,13 +717,12 @@ dom.btnRequests.addEventListener('click', (e) => {
 dom.btnConnect.addEventListener('click', () => {
     const targetUsername = dom.searchInput.value.trim();
     if (!targetUsername) return;
-    
+
     const existingContact = document.querySelector(`.contact-item[data-username="${targetUsername}"]`);
     if (existingContact) {
         startHandshake(targetUsername);
     } else {
         socket.emit('send_friend_request', { targetUsername });
-        alert(`Đã gửi lời mời tới ${targetUsername}.`);
     }
 });
 
