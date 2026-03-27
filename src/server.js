@@ -58,7 +58,33 @@ connectDB();
 
 // [MỚI] Helmet: tự động thêm các HTTP security headers
 // Bảo vệ khỏi Clickjacking, XSS, MIME sniffing, v.v.
-app.use(helmet());
+// Cấu hình CSP cho phép:
+//   - socket.io script từ cùng origin
+//   - ES module scripts (type="module") trong public/js/
+//   - KHÔNG cho phép inline onclick="..." (đã dùng addEventListener thay thế)
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: [
+                "'self'",
+                // Cho phép socket.io client script
+                // (được serve từ /socket.io/socket.io.js — cùng origin)
+            ],
+            scriptSrcAttr: ["'none'"],   // Chặn inline onclick="..." — đúng theo thiết kế mới
+            styleSrc:  ["'self'", "'unsafe-inline'"], // Cho phép style inline (dùng trong HTML)
+            imgSrc:    ["'self'", "data:"],
+            connectSrc: ["'self'", "ws:", "wss:"],    // Cho phép WebSocket (socket.io)
+            fontSrc:   ["'self'"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+        },
+        // Tắt reportOnly để thực sự block (không chỉ báo cáo)
+        reportOnly: false,
+    },
+    // Các headers khác giữ mặc định của helmet
+    crossOriginEmbedderPolicy: false, // Tắt COEP nếu cần load tài nguyên cross-origin
+}));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

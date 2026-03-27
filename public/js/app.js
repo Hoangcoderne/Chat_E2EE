@@ -92,6 +92,8 @@ async function authFetch(url, options = {}, _isRetry = false) {
     return res;
 }
 
+// [FIX #5] Refresh token nằm trong HttpOnly Cookie — browser tự gửi kèm
+// Không cần đọc/gửi refreshToken từ localStorage nữa
 async function tryRefreshToken() {
     try {
         const res = await fetch('/api/auth/refresh', {
@@ -129,6 +131,7 @@ function loadKeyFromDB(id = 'my-private-key') {
 
 async function logout() {
     try {
+        // [FIX #5] Không cần gửi refreshToken trong body
         // Server đọc từ HttpOnly cookie và tự xóa cookie đó
         fetch('/api/auth/logout', {
             method: 'POST',
@@ -183,7 +186,7 @@ async function initApp() {
         await loadFriendRequests();
         await loadNotifications();
 
-        console.log("App Initialized. Ready to E2EE.");
+        console.log("✅ App Initialized. Ready to E2EE.");
 
     } catch (err) {
         console.error(err);
@@ -200,7 +203,7 @@ async function initApp() {
 socket.on('response_public_key', async (data) => {
     try {
         const { userId, publicKey, username, signingPublicKey } = data;
-        console.log("Handshake: Received key from", username);
+        console.log("🔑 Handshake: Received key from", username);
 
         const partnerKeyObj = await importPublicKey(publicKey);
         const sharedKey = await deriveSharedSecret(myIdentity.privateKey, partnerKeyObj);
@@ -257,7 +260,7 @@ socket.on('receive_message', async (payload) => {
         appendMessage(decryptedText, 'received', signatureValid);
     } catch (err) {
         console.error("Decryption failed:", err);
-        appendMessage("[Lỗi giải mã]", 'received', false);
+        appendMessage("⚠️ [Lỗi giải mã]", 'received', false);
     }
 });
 
@@ -426,6 +429,7 @@ async function loadNotifications() {
 // 6. UI RENDERING & INTERACTIONS
 // ============================================================
 
+// [FIX #3] Vẽ contact item dùng đúng class CSS đã định nghĩa trong main.css
 function renderContactItem(user) {
     if (document.querySelector(`.contact-item[data-id="${user._id}"]`)) return;
 
@@ -438,21 +442,55 @@ function renderContactItem(user) {
 
     const onlineClass = user.online ? 'online' : '';
 
-    li.innerHTML = `
-        <div class="avatar-container">
-            <div class="avatar">${user.username[0].toUpperCase()}</div>
-            <div class="status-dot ${onlineClass}" id="status-${user._id}"></div>
-        </div>
-        <div class="contact-info">
-            <div class="contact-name">${user.username}</div>
-            <div class="last-message">Nhấn để chat</div>
-        </div>
-        <button class="contact-options-btn" onclick="toggleMenu(event, '${user._id}')">⋮</button>
-        <div id="menu-${user._id}" class="options-menu hidden">
-            <button class="danger" onclick="handleBlock(event, '${user._id}')">🚫 Chặn</button>
-            <button class="danger" onclick="handleUnfriend(event, '${user._id}')">❌ Hủy kết bạn</button>
-        </div>
+    // ── Menu: tạo ngoài li, append vào body để tránh overflow clipping ──
+    const menu = document.createElement('div');
+    menu.id = `menu-${user._id}`;
+    menu.className = 'options-menu hidden';
+
+    // [FIX CSP] Không dùng onclick="..." inline — vi phạm Content Security Policy
+    // Dùng createElement + addEventListener thay thế
+    const btnBlock   = document.createElement('button');
+    btnBlock.className = 'danger';
+    btnBlock.textContent = '🚫 Chặn';
+    btnBlock.addEventListener('click', (e) => handleBlock(e, user._id));
+
+    const btnUnfriend = document.createElement('button');
+    btnUnfriend.className = 'danger';
+    btnUnfriend.textContent = '❌ Hủy kết bạn';
+    btnUnfriend.addEventListener('click', (e) => handleUnfriend(e, user._id));
+
+    menu.appendChild(btnBlock);
+    menu.appendChild(btnUnfriend);
+    document.body.appendChild(menu);
+
+    // ── Nội dung li: không có inline event handler nào ──
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar-container';
+    avatar.innerHTML = `
+        <div class="avatar">${user.username[0].toUpperCase()}</div>
+        <div class="status-dot ${onlineClass}" id="status-${user._id}"></div>
     `;
+
+    const info = document.createElement('div');
+    info.className = 'contact-info';
+    info.innerHTML = `
+        <div class="contact-name">${user.username}</div>
+        <div class="last-message">Nhấn để chat</div>
+    `;
+
+    // [FIX CSP] Nút ⋮ dùng addEventListener thay vì onclick="..."
+    const optionsBtn = document.createElement('button');
+    optionsBtn.className = 'contact-options-btn';
+    optionsBtn.textContent = '⋮';
+    optionsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        toggleMenu(e, optionsBtn, user._id);
+    });
+
+    li.appendChild(avatar);
+    li.appendChild(info);
+    li.appendChild(optionsBtn);
 
     li.addEventListener('click', (e) => {
         if (e.target.closest('.contact-options-btn') || e.target.closest('.options-menu')) return;
@@ -616,11 +654,46 @@ async function sendMessage() {
 
 // --- GLOBAL HANDLERS ---
 
-window.toggleMenu = function(e, id) {
+window.toggleMenu = function(e, btn, id) {
     e.stopPropagation();
-    document.querySelectorAll('.options-menu').forEach(el => el.classList.add('hidden'));
+    e.preventDefault();
+
     const menu = document.getElementById(`menu-${id}`);
-    if (menu) menu.classList.toggle('hidden');
+    if (!menu) {
+        console.error('[toggleMenu] menu element not found: menu-' + id);
+        return;
+    }
+
+    // Lưu trạng thái TRƯỚC khi đóng tất cả
+    const isOpen = !menu.classList.contains('hidden');
+
+    // Đóng tất cả menu đang mở
+    document.querySelectorAll('.options-menu').forEach(el => el.classList.add('hidden'));
+
+    // Nếu menu này đang mở → chỉ đóng, không mở lại
+    if (isOpen) return;
+
+    // === Định vị menu ===
+    // [FIX] Dùng `btn` được truyền vào thay vì e.currentTarget
+    // e.currentTarget trong inline onclick không đáng tin cậy (có thể null)
+    const btnRect = btn.getBoundingClientRect();
+
+    // Hiển thị trước để đo kích thước chính xác
+    menu.classList.remove('hidden');
+
+    const menuW = menu.offsetWidth  || 140;
+    const menuH = menu.offsetHeight || 80;
+
+    // position:fixed → tọa độ viewport, KHÔNG cộng scrollX/scrollY
+    let top  = btnRect.bottom + 4;
+    let left = btnRect.right - menuW;
+
+    if (top + menuH > window.innerHeight) top = btnRect.top - menuH - 4;
+    if (left < 8) left = 8;
+
+    menu.style.top  = `${top}px`;
+    menu.style.left = `${left}px`;
+
 }
 
 window.handleUnfriend = async function(e, targetId) {
@@ -637,6 +710,9 @@ window.handleUnfriend = async function(e, targetId) {
         const data = await res.json();
         if (data.success) {
             document.querySelector(`.contact-item[data-id="${targetId}"]`).remove();
+            // [FIX] Xóa menu element khỏi document.body khi unfriend
+            const orphanMenu = document.getElementById(`menu-${targetId}`);
+            if (orphanMenu) orphanMenu.remove();
             if (currentChat.partnerId === targetId) {
                 dom.chatHeader.classList.add('hidden');
                 dom.messagesList.innerHTML = '';
@@ -703,11 +779,11 @@ dom.msgInput.addEventListener('keypress', (e) => {
 });
 
 document.addEventListener('click', (e) => {
-    if (e.target.closest('.contact-options-btn') || e.target.closest('.options-menu')) {
-        return;
+    // [FIX] Không đóng menu nếu click vào chính nút ⋮ hoặc bên trong menu
+    // Trường hợp stopPropagation() không ngăn được document listener
+    if (!e.target.closest('.contact-options-btn') && !e.target.closest('.options-menu')) {
+        document.querySelectorAll('.options-menu').forEach(el => el.classList.add('hidden'));
     }
-    
-    document.querySelectorAll('.options-menu').forEach(el => el.classList.add('hidden'));
     if (!dom.reqPopup.contains(e.target) && e.target !== dom.btnRequests) {
         dom.reqPopup.classList.add('hidden');
     }

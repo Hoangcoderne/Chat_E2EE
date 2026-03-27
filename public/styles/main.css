@@ -184,7 +184,6 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     gap: 10px;
 }
 
-/* Tinh chỉnh nút Đăng xuất cho đẹp hơn */
 .small-btn {
     background-color: #ff4d4d;
     color: white;
@@ -201,7 +200,6 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
 
 .small-btn:hover { background-color: #cc0000; }
 
-/* Tinh chỉnh nút Chuông để icon to rõ hơn chút */
 .icon-btn {
     font-size: 1.3em;
     padding: 0;
@@ -213,41 +211,50 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
 .contact-options-btn {
     background: none;
     border: none;
-    color: #999;
+    /* [FIX] Dùng color:transparent thay vì display:none          */
+    /* display:none gây mất click target khi chuyển hover → click */
+    color: transparent;
     font-size: 1.2em;
     padding: 0 5px;
     cursor: pointer;
-    display: none;
+    flex-shrink: 0;
+    transition: color 0.15s;
 }
 
-.contact-item:hover .contact-options-btn { display: block; }
+.contact-item:hover .contact-options-btn { color: #999; }
+.contact-options-btn:hover { color: #333 !important; }
 
 /* Menu Dropdown */
+/* [FIX] position:fixed thay vì absolute                            */
+/* Lý do: .contacts-area có overflow-y:auto tạo clipping context   */
+/* Mọi position:absolute bên trong đều bị cắt bởi scroll container */
+/* position:fixed thoát ra ngoài hoàn toàn, không bị cắt           */
+/* top/left được tính động bằng getBoundingClientRect() trong JS    */
 .options-menu {
-    position: absolute;
-    right: 10px;
-    top: 30px;
+    position: fixed;
     background: white;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    border-radius: 5px;
-    z-index: 100;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    border-radius: 7px;
+    z-index: 9999;
     overflow: hidden;
-    width: 120px;
+    width: 140px;
+    border: 1px solid #e8e8e8;
 }
 
 .options-menu button {
     display: block;
     width: 100%;
-    padding: 8px 10px;
+    padding: 10px 14px;
     border: none;
     background: none;
     text-align: left;
     cursor: pointer;
-    font-size: 0.9em;
+    font-size: 0.88em;
+    transition: background 0.12s;
 }
 
-.options-menu button:hover { background-color: #f0f0f0; }
-.options-menu button.danger { color: red; }
+.options-menu button:hover { background-color: #f5f5f5; }
+.options-menu button.danger { color: #e03131; font-weight: 500; }
 
 /* Block Overlay */
 .block-overlay {
