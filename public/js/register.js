@@ -174,9 +174,9 @@ function showRecoveryKey(recoveryDisplay) {
             font-size: 0.9em; margin-bottom: 16px;
         ">📋 Sao chép</button>
         <div>
-            <label style="display:flex; align-items:center; gap:8px; justify-content:center; font-size:0.85em; cursor:pointer">
+            <label style="display:flex; align-items:center; gap:4px; justify-content:center; font-size:0.85em; cursor:pointer">
                 <input type="checkbox" id="confirm-saved">
-                Tôi đã lưu Recovery Key an toàn
+                Xác nhận đã lưu Recovery Key!!!
             </label>
         </div>
         <button id="btn-goto-login" style="
