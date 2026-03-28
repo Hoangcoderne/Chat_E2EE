@@ -40,7 +40,7 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
 .contact-item:hover { background-color: #e0e0e0; }
 .contact-item.active { background-color: #d1e7dd; }
 
-/* Avatar container: bọc avatar + chấm trạng thái */
+/* [FIX #3] Avatar container: bọc avatar + chấm trạng thái */
 .avatar-container {
     position: relative;
     margin-right: 10px;
@@ -60,7 +60,7 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     font-size: 1em;
 }
 
-/* Đặt chấm trạng thái góc dưới-phải avatar */
+/* [FIX #3] Đặt chấm trạng thái góc dưới-phải avatar */
 .avatar-container .status-dot {
     position: absolute;
     bottom: 0;
@@ -76,7 +76,7 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     box-shadow: 0 0 3px #28a745;
 }
 
-/* Thông tin liên hệ bên phải avatar */
+/* [FIX #3] Thông tin liên hệ bên phải avatar */
 .contact-info {
     display: flex;
     flex-direction: column;
@@ -92,7 +92,7 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     text-overflow: ellipsis;
 }
 
-/* Dòng preview tin nhắn cuối */
+/* [FIX #3] Dòng preview tin nhắn cuối */
 .last-message {
     font-size: 0.78em;
     color: #999;
@@ -289,3 +289,64 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
 }
 
 .block-btn:hover { background-color: #4e4f50; }
+
+/* ════════════════════════════════════════════════════
+   [MỚI] TIMESTAMP + READ STATUS + UNREAD BADGE
+   ════════════════════════════════════════════════════ */
+
+/* Wrapper bao ngoài mỗi tin nhắn (bubble + meta) */
+.msg-wrapper {
+    display: flex;
+    flex-direction: column;
+    max-width: 62%;
+}
+.wrapper-sent     { align-self: flex-end;   align-items: flex-end; }
+.wrapper-received { align-self: flex-start; align-items: flex-start; }
+.wrapper-system   { align-self: center; }
+
+/* Meta: thời gian + trạng thái đọc */
+.msg-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 3px;
+    margin-bottom: 4px;
+}
+.meta-sent     { justify-content: flex-end; }
+.meta-received { justify-content: flex-start; }
+
+/* Thời gian */
+.msg-time {
+    font-size: 0.72em;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+
+/* Trạng thái đọc: ✓ gửi / ✓✓ đã đọc */
+.msg-status {
+    font-size: 0.78em;
+    color: #94a3b8;    /* xám = đã gửi */
+    margin-left: 2px;
+    transition: color 0.2s;
+}
+.msg-status.read {
+    color: #0084ff;    /* xanh = đã đọc */
+}
+
+/* ── Unread badge trên sidebar ── */
+.unread-badge {
+    min-width: 20px;
+    height: 20px;
+    background: #ef4444;
+    color: white;
+    font-size: 0.72em;
+    font-weight: 700;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    flex-shrink: 0;
+    margin-left: 4px;
+    margin-right: 6px;
+}

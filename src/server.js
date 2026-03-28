@@ -217,8 +217,22 @@ io.on('connection', (socket) => {
             });
             await newMessage.save();
 
+            // Gửi tới recipient
             io.to(recipientId).emit('receive_message', {
+                messageId: newMessage._id.toString(),
                 senderId,
+                encryptedContent,
+                iv,
+                signature: signature || null,
+                timestamp: newMessage.timestamp
+            });
+
+            // [MỚI] Đồng bộ tới TẤT CẢ thiết bị của sender (multi-device)
+            // Kèm senderSocketId để thiết bị gửi bỏ qua (đã hiển thị local)
+            io.to(senderId).emit('message_sent_sync', {
+                messageId: newMessage._id.toString(),
+                senderSocketId: socket.id,
+                recipientId,
                 encryptedContent,
                 iv,
                 signature: signature || null,
@@ -226,6 +240,29 @@ io.on('connection', (socket) => {
             });
         } catch (err) {
             logger.error({ event: 'socket_error', handler: 'send_message', error: err.message });
+        }
+    });
+
+    // [MỚI] 3b. Đánh dấu đã đọc — client gọi khi mở chat với một người
+    socket.on('mark_read', async ({ partnerId }) => {
+        try {
+            if (!socket.userId) return;
+
+            // Cập nhật DB: tất cả tin từ partner → mình thành read:true
+            const result = await Message.updateMany(
+                { sender: partnerId, recipient: socket.userId, read: false },
+                { read: true }
+            );
+
+            // Thông báo cho partner biết tin nhắn đã được đọc
+            // (để họ cập nhật dấu ✓✓ trên tin nhắn đã gửi)
+            if (result.modifiedCount > 0) {
+                io.to(partnerId).emit('messages_read', {
+                    by: socket.userId
+                });
+            }
+        } catch (err) {
+            logger.error({ event: 'socket_error', handler: 'mark_read', error: err.message });
         }
     });
 

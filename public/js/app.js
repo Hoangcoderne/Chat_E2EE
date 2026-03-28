@@ -24,6 +24,9 @@ let currentChat = {
     sharedSecret: null
 };
 
+// [MỚI] Theo dõi số tin chưa đọc theo từng contactId
+let unreadCounts = {};
+
 // DOM Elements
 const dom = {
     status: document.getElementById('status-bar'),
@@ -112,6 +115,43 @@ async function tryRefreshToken() {
         console.error("Refresh failed:", err);
         return false;
     }
+}
+
+// [MỚI] Format timestamp hiển thị trên tin nhắn
+function formatTime(date) {
+    const d = new Date(date);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday = d.toDateString() === yesterday.toDateString();
+
+    const timeStr = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+    if (isToday) return timeStr;
+    if (isYesterday) return `Hôm qua ${timeStr}`;
+    return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + timeStr;
+}
+
+// [MỚI] Cập nhật badge số tin chưa đọc trên sidebar
+function setUnreadBadge(userId, count) {
+    unreadCounts[userId] = count;
+    const badge = document.getElementById(`unread-${userId}`);
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+function incrementUnreadBadge(userId) {
+    setUnreadBadge(userId, (unreadCounts[userId] || 0) + 1);
+}
+
+function resetUnreadBadge(userId) {
+    setUnreadBadge(userId, 0);
 }
 
 function loadKeyFromDB(id = 'my-private-key') {
@@ -232,6 +272,9 @@ socket.on('response_public_key', async (data) => {
 
         await loadChatHistory();
 
+        // [MỚI] Reset badge ngay khi mở chat
+        resetUnreadBadge(userId);
+
     } catch (err) {
         console.error("Lỗi Handshake:", err);
         alert("Lỗi thiết lập mã hóa.");
@@ -240,28 +283,70 @@ socket.on('response_public_key', async (data) => {
 
 // B. Nhận tin nhắn
 socket.on('receive_message', async (payload) => {
-    if (payload.senderId !== currentChat.partnerId) return;
+    // [MỚI] Cập nhật preview sidebar dù chat có đang mở hay không
+    updateContactPreview(payload.senderId);
 
-    try {
-        const decryptedText = await decryptMessage(
-            { ciphertext: payload.encryptedContent, iv: payload.iv },
-            currentChat.sharedSecret
-        );
-
-        let signatureValid = null;
-        if (payload.signature && currentChat.partnerSigningPublicKey) {
-            signatureValid = await verifySignature(
-                decryptedText,
-                payload.signature,
-                currentChat.partnerSigningPublicKey
+    // Nếu đang chat với người này → hiện tin + mark read ngay
+    if (payload.senderId === currentChat.partnerId) {
+        try {
+            const decryptedText = await decryptMessage(
+                { ciphertext: payload.encryptedContent, iv: payload.iv },
+                currentChat.sharedSecret
             );
+            let signatureValid = null;
+            if (payload.signature && currentChat.partnerSigningPublicKey) {
+                signatureValid = await verifySignature(
+                    decryptedText, payload.signature, currentChat.partnerSigningPublicKey
+                );
+            }
+            appendMessage(decryptedText, 'received', signatureValid, payload.timestamp, payload.messageId);
+            // Đang xem chat → đánh dấu đã đọc ngay
+            socket.emit('mark_read', { partnerId: payload.senderId });
+        } catch (err) {
+            console.error("Decryption failed:", err);
+            appendMessage("⚠️ [Lỗi giải mã]", 'received', false);
         }
-
-        appendMessage(decryptedText, 'received', signatureValid);
-    } catch (err) {
-        console.error("Decryption failed:", err);
-        appendMessage("⚠️ [Lỗi giải mã]", 'received', false);
+    } else {
+        // [MỚI] Chat khác đang mở → tăng badge
+        incrementUnreadBadge(payload.senderId);
     }
+});
+
+// [MỚI] B2. Đồng bộ tin nhắn đã gửi sang thiết bị khác (cùng tài khoản)
+socket.on('message_sent_sync', async (payload) => {
+    const { senderSocketId, messageId, recipientId, encryptedContent, iv, signature, timestamp } = payload;
+
+    // Nếu đây chính là socket đã gửi → chỉ cập nhật msgId cho temp message
+    if (senderSocketId === socket.id) {
+        const tempEl = dom.messagesList.querySelector('[data-temp="true"]');
+        if (tempEl) {
+            tempEl.removeAttribute('data-temp');
+            tempEl.dataset.msgId = messageId;
+        }
+        return;
+    }
+
+    // Thiết bị khác của cùng tài khoản → giải mã và hiển thị nếu đang mở chat đó
+    updateContactPreview(recipientId);
+
+    if (currentChat.partnerId === recipientId && currentChat.sharedSecret) {
+        try {
+            const text = await decryptMessage({ ciphertext: encryptedContent, iv }, currentChat.sharedSecret);
+            appendMessage(text, 'sent', null, timestamp, messageId);
+        } catch (e) {
+            appendMessage('[Tin nhắn từ thiết bị khác]', 'system');
+        }
+    }
+});
+
+// [MỚI] B3. Nhận thông báo tin đã được đọc (partner đọc tin mình gửi)
+socket.on('messages_read', ({ by }) => {
+    if (currentChat.partnerId !== by) return;
+    // Cập nhật tất cả ✓ → ✓✓ xanh trong cuộc chat hiện tại
+    document.querySelectorAll('.msg-wrapper .msg-status').forEach(el => {
+        el.textContent = '✓✓';
+        el.classList.add('read');
+    });
 });
 
 // C. Trạng thái Online/Offline
@@ -391,12 +476,26 @@ async function loadChatHistory() {
                     );
                 }
 
-                appendMessage(decryptedText, type, signatureValid);
+                appendMessage(decryptedText, type, signatureValid, msg.timestamp, msg._id);
+
+                // Nếu là tin mình gửi và đã được đọc → hiện ✓✓ ngay
+                if (type === 'sent' && msg.read) {
+                    const lastWrapper = dom.messagesList.lastElementChild;
+                    const statusEl = lastWrapper?.querySelector('.msg-status');
+                    if (statusEl) {
+                        statusEl.textContent = '✓✓';
+                        statusEl.classList.add('read');
+                    }
+                }
             } catch (err) {
-                appendMessage("[Tin nhắn lỗi]", 'received', false);
+                appendMessage("[Tin nhắn lỗi]", 'received', false, msg.timestamp);
             }
         }
         dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
+
+        // [MỚI] Đánh dấu đã đọc + reset badge sau khi load history
+        socket.emit('mark_read', { partnerId });
+        resetUnreadBadge(partnerId);
     } catch (err) {
         console.error("Lỗi tải history:", err);
     }
@@ -475,8 +574,18 @@ function renderContactItem(user) {
     info.className = 'contact-info';
     info.innerHTML = `
         <div class="contact-name">${user.username}</div>
-        <div class="last-message">Nhấn để chat</div>
+        <div class="last-message" id="preview-${user._id}">Nhấn để chat</div>
     `;
+
+    // [MỚI] Badge số tin chưa đọc
+    const badge = document.createElement('span');
+    badge.className = 'unread-badge hidden';
+    badge.id = `unread-${user._id}`;
+    if (user.unreadCount > 0) {
+        badge.textContent = user.unreadCount > 99 ? '99+' : user.unreadCount;
+        badge.classList.remove('hidden');
+        unreadCounts[user._id] = user.unreadCount;
+    }
 
     // [FIX CSP] Nút ⋮ dùng addEventListener thay vì onclick="..."
     const optionsBtn = document.createElement('button');
@@ -490,6 +599,7 @@ function renderContactItem(user) {
 
     li.appendChild(avatar);
     li.appendChild(info);
+    li.appendChild(badge);
     li.appendChild(optionsBtn);
 
     li.addEventListener('click', (e) => {
@@ -577,34 +687,65 @@ function updateRequestUI() {
     });
 }
 
-function appendMessage(text, type, signatureValid = null) {
+// [MỚI] appendMessage với timestamp, read status, msgId
+// isTemp=true: tin vừa gửi, chờ sync từ server để gán msgId thật
+function appendMessage(text, type, signatureValid = null, timestamp = null, msgId = null, isTemp = false) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'msg-wrapper ' + (type === 'sent' ? 'wrapper-sent' : type === 'system' ? 'wrapper-system' : 'wrapper-received');
+
+    if (msgId)   wrapper.dataset.msgId = msgId;
+    if (isTemp)  wrapper.dataset.temp = 'true';
+
     const div = document.createElement('div');
 
     if (signatureValid === false) {
         div.classList.add('message', 'msg-received');
-        div.style.cssText = `
-            background: #fff0f0;
-            border: 1.5px solid #ffb3b3;
-            color: #cc0000;
-            padding: 10px 14px;
-        `;
+        div.style.cssText = 'background:#fff0f0;border:1.5px solid #ffb3b3;color:#cc0000;padding:10px 14px;';
         div.innerHTML = `
-            <div style="font-weight:600; font-size:0.95em">
-                ⚠️ Cảnh báo: Chữ ký không hợp lệ
-            </div>
-            <div style="font-size:0.82em; margin-top:5px; color:#aa0000; line-height:1.4">
-                Tin nhắn này có thể đã bị chỉnh sửa hoặc giả mạo.<br>
-                Nội dung bị ẩn để bảo vệ bạn.
-            </div>
-        `;
+            <div style="font-weight:600;font-size:0.95em">⚠️ Cảnh báo: Chữ ký không hợp lệ</div>
+            <div style="font-size:0.82em;margin-top:5px;color:#aa0000;line-height:1.4">
+                Tin nhắn này có thể đã bị chỉnh sửa hoặc giả mạo.<br>Nội dung bị ẩn để bảo vệ bạn.
+            </div>`;
     } else {
-        div.classList.add('message', type === 'sent' ? 'msg-sent' :
-                          type === 'system' ? 'system-msg' : 'msg-received');
+        div.classList.add('message',
+            type === 'sent' ? 'msg-sent' :
+            type === 'system' ? 'system-msg' : 'msg-received');
         div.innerText = text;
     }
 
-    dom.messagesList.appendChild(div);
+    wrapper.appendChild(div);
+
+    // Timestamp + read status (không hiện cho system message)
+    if (type !== 'system') {
+        const meta = document.createElement('div');
+        meta.className = 'msg-meta ' + (type === 'sent' ? 'meta-sent' : 'meta-received');
+
+        // Thời gian
+        const timeEl = document.createElement('span');
+        timeEl.className = 'msg-time';
+        timeEl.textContent = formatTime(timestamp || new Date());
+        meta.appendChild(timeEl);
+
+        // Trạng thái đọc (chỉ cho tin mình gửi)
+        if (type === 'sent') {
+            const statusEl = document.createElement('span');
+            statusEl.className = 'msg-status';
+            statusEl.textContent = '✓';
+            meta.appendChild(statusEl);
+        }
+
+        wrapper.appendChild(meta);
+    }
+
+    dom.messagesList.appendChild(wrapper);
     dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
+    return wrapper;
+}
+
+// [MỚI] Cập nhật dòng preview "Tin nhắn mới" ở sidebar
+function updateContactPreview(userId) {
+    const el = document.getElementById(`preview-${userId}`);
+    if (el) el.textContent = 'Có tin nhắn mới';
 }
 
 function updateHeaderStatus(userId) {
@@ -644,7 +785,8 @@ async function sendMessage() {
             signature
         });
 
-        appendMessage(text, 'sent', null);
+        // [MỚI] isTemp=true: hiện ngay, chờ message_sent_sync gán msgId thật
+        appendMessage(text, 'sent', null, new Date(), null, true);
         dom.msgInput.value = '';
     } catch (err) {
         console.error("Lỗi gửi tin:", err);

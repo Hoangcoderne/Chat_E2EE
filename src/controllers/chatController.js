@@ -4,10 +4,11 @@ const Message = require('../models/Message');
 const User = require('../models/User');
 const Friendship = require('../models/Friendship');
 
+// ── Lịch sử chat ──────────────────────────────────────────────
 exports.getChatHistory = async (req, res) => {
     try {
-        const currentUserId = req.user.userId; // Lấy từ Token
-        const { partnerId } = req.params;      // Lấy từ URL
+        const currentUserId = req.user.userId;
+        const { partnerId } = req.params;
 
         const messages = await Message.find({
             $or: [
@@ -16,6 +17,12 @@ exports.getChatHistory = async (req, res) => {
             ]
         }).sort({ timestamp: 1 });
 
+        // [MỚI] Đánh dấu đã đọc tất cả tin nhắn từ partner → mình
+        await Message.updateMany(
+            { sender: partnerId, recipient: currentUserId, read: false },
+            { read: true }
+        );
+
         res.json(messages);
     } catch (err) {
         console.error("Lỗi lấy lịch sử chat:", err);
@@ -23,28 +30,45 @@ exports.getChatHistory = async (req, res) => {
     }
 };
 
-// API LẤY DANH SÁCH BẠN BÈ 
+// ── Danh sách bạn bè + unread count ───────────────────────────
 exports.getContacts = async (req, res) => {
     try {
         const currentUserId = req.user.userId;
 
-        // Lấy CẢ bạn bè (accepted) và người bị chặn (blocked)
         const friendships = await Friendship.find({
             $or: [{ requester: currentUserId }, { recipient: currentUserId }],
-            status: { $in: ['accepted', 'blocked'] } 
+            status: { $in: ['accepted', 'blocked'] }
         }).populate('requester recipient', 'username _id');
+
+        // [MỚI] Aggregate số tin chưa đọc từng người gửi
+        const unreadAgg = await Message.aggregate([
+            {
+                $match: {
+                    recipient: new mongoose.Types.ObjectId(currentUserId),
+                    read: false
+                }
+            },
+            { $group: { _id: '$sender', count: { $sum: 1 } } }
+        ]);
+
+        // Map: senderId → unreadCount
+        const unreadMap = {};
+        unreadAgg.forEach(({ _id, count }) => {
+            unreadMap[_id.toString()] = count;
+        });
 
         const contacts = friendships.map(f => {
             const isRequester = f.requester._id.toString() === currentUserId;
             const friend = isRequester ? f.recipient : f.requester;
-            
+
             return {
                 _id: friend._id,
                 username: friend.username,
                 online: global.onlineUsers ? global.onlineUsers.has(friend._id.toString()) : false,
                 status: f.status,
-                // Do logic blockUser cũ: Ai chủ động chặn sẽ được set làm requester
-                isBlocker: (f.status === 'blocked' && isRequester) 
+                isBlocker: (f.status === 'blocked' && isRequester),
+                // [MỚI] Số tin nhắn chưa đọc từ người này
+                unreadCount: unreadMap[friend._id.toString()] || 0
             };
         });
 
@@ -55,7 +79,7 @@ exports.getContacts = async (req, res) => {
     }
 };
 
-// 2. THÊM HÀM MỚI Ở CUỐI FILE: Mở chặn
+// ── Bỏ chặn ───────────────────────────────────────────────────
 exports.unblockUser = async (req, res) => {
     try {
         const { targetId } = req.body;
@@ -74,52 +98,48 @@ exports.unblockUser = async (req, res) => {
     }
 };
 
-// API LẤY LỜI MỜI KẾT BẠN
+// ── Lời mời kết bạn ───────────────────────────────────────────
 exports.getFriendRequests = async (req, res) => {
     try {
-        const currentUserId = req.user.userId; // Lấy từ Token
+        const currentUserId = req.user.userId;
 
         const requests = await Friendship.find({
             recipient: currentUserId,
             status: 'pending'
         }).populate('requester', 'username _id');
 
-        const formattedRequests = requests.map(req => ({
-            fromId: req.requester._id,
-            fromUser: req.requester.username
-        }));
-        res.json(formattedRequests);
+        res.json(requests.map(r => ({
+            fromId: r.requester._id,
+            fromUser: r.requester.username
+        })));
     } catch (err) {
         console.error(err);
         res.status(500).json([]);
     }
 };
 
+// ── Thông báo ─────────────────────────────────────────────────
 exports.getNotifications = async (req, res) => {
     try {
-        const currentUserId = req.user.userId; // Lấy từ Token
+        const currentUserId = req.user.userId;
         const user = await User.findById(currentUserId).select('notifications');
-        
-        const sortedNotifs = user.notifications.sort((a, b) => b.createdAt - a.createdAt);
-        res.json(sortedNotifs);
+        res.json(user.notifications.sort((a, b) => b.createdAt - a.createdAt));
     } catch (err) {
         console.error(err);
         res.status(500).json([]);
     }
 };
 
-// Hủy kết bạn (Xóa record)
+// ── Hủy kết bạn ───────────────────────────────────────────────
 exports.unfriend = async (req, res) => {
     try {
         const { targetId } = req.body;
-        const currentUserId = req.user.userId; // Lấy từ authMiddleware
+        const currentUserId = req.user.userId;
 
-        // 1. Validate định dạng ObjectId
         if (!targetId || !mongoose.Types.ObjectId.isValid(targetId)) {
             return res.status(400).json({ success: false, message: "ID người dùng không hợp lệ." });
         }
 
-        // 2. Thực hiện xóa
         const result = await Friendship.findOneAndDelete({
             $or: [
                 { requester: currentUserId, recipient: targetId },
@@ -127,9 +147,8 @@ exports.unfriend = async (req, res) => {
             ]
         });
 
-        // 3. Kiểm tra xem có thật sự xóa được record nào không
         if (!result) {
-            return res.status(404).json({ success: false, message: "Không tìm thấy quan hệ bạn bè để xóa." });
+            return res.status(404).json({ success: false, message: "Không tìm thấy quan hệ bạn bè." });
         }
 
         res.json({ success: true, message: "Đã hủy kết bạn." });
@@ -139,19 +158,16 @@ exports.unfriend = async (req, res) => {
     }
 };
 
-// Chặn người dùng
+// ── Chặn người dùng ───────────────────────────────────────────
 exports.blockUser = async (req, res) => {
     try {
         const { targetId } = req.body;
         const currentUserId = req.user.userId;
 
-        // 1. Validate định dạng ObjectId
         if (!targetId || !mongoose.Types.ObjectId.isValid(targetId)) {
             return res.status(400).json({ success: false, message: "ID người dùng không hợp lệ." });
         }
 
-        // [FIX] Xóa record cũ trước, rồi tạo mới với đúng chiều requester=blocker
-        // Tránh vi phạm unique index khi đảo chiều (A,B) -> (B,A)
         await Friendship.findOneAndDelete({
             $or: [
                 { requester: currentUserId, recipient: targetId },
@@ -160,7 +176,7 @@ exports.blockUser = async (req, res) => {
         });
 
         await Friendship.create({
-            requester: currentUserId, // Người chặn luôn là requester
+            requester: currentUserId,
             recipient: targetId,
             status: 'blocked'
         });
