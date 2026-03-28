@@ -350,3 +350,201 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     margin-left: 4px;
     margin-right: 6px;
 }
+
+/* ════════════════════════════════════════════════════
+   [MỚI] MESSAGE ACTION BUTTONS (hover: ⋯ 😊)
+   ════════════════════════════════════════════════════ */
+
+/* msg-row bọc ngoài cả bubble + action buttons */
+.msg-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+}
+.row-sent     { flex-direction: row; }       /* actions ở TRÁI bubble */
+.row-received { flex-direction: row-reverse; } /* actions ở PHẢI bubble */
+
+/* Container chứa 2 nút action */
+.msg-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity .15s;
+    flex-shrink: 0;
+}
+/* Hiện khi hover vào wrapper */
+.msg-wrapper:hover .msg-actions { opacity: 1; }
+
+.msg-action-btn {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,.12);
+    transition: background .12s, transform .1s;
+    padding: 0;
+}
+.msg-action-btn:hover {
+    background: #f0f0f0;
+    transform: scale(1.1);
+}
+
+/* ── Emoji picker ── */
+.emoji-picker {
+    position: fixed;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 24px;
+    padding: 6px 8px;
+    display: flex;
+    gap: 2px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.15);
+    z-index: 9999;
+}
+.emoji-option {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px 5px;
+    border-radius: 50%;
+    transition: background .1s, transform .1s;
+}
+.emoji-option:hover {
+    background: #f0f0f0;
+    transform: scale(1.25);
+}
+
+/* ── Message options menu (⋯) ── */
+.msg-options-menu {
+    position: fixed;
+    background: white;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.15);
+    z-index: 9999;
+    overflow: hidden;
+    min-width: 160px;
+}
+.msg-options-menu button {
+    display: block;
+    width: 100%;
+    padding: 10px 14px;
+    border: none;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background .1s;
+}
+.msg-options-menu button:hover { background: #f5f5f5; }
+.msg-options-menu button.danger { color: #e03131; }
+
+/* ── Reaction bar ── */
+.reaction-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-height: 0;
+    margin-top: 3px;
+}
+.rbar-sent     { justify-content: flex-end; }
+.rbar-received { justify-content: flex-start; }
+
+.reaction-pill {
+    background: #f0f0f0;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 2px 7px;
+    font-size: 13px;
+    cursor: default;
+    user-select: none;
+    transition: background .1s;
+}
+.reaction-pill.my-reaction {
+    background: #dbeafe;
+    border-color: #93c5fd;
+}
+
+/* ── Forward modal ── */
+.forward-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.forward-modal-box {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    width: 320px;
+    max-height: 480px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.2);
+}
+.forward-modal-box h4 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+}
+.forward-subtitle {
+    font-size: 12px;
+    color: #666;
+    margin: 0;
+}
+.forward-contact-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.forward-contact-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background .12s;
+    font-size: 14px;
+}
+.forward-contact-item:hover { background: #f0f4ff; }
+.forward-avatar {
+    width: 34px; height: 34px;
+    background: #0084ff;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+.forward-close-btn {
+    padding: 9px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: none;
+    cursor: pointer;
+    font-size: 13px;
+    color: #666;
+    transition: background .12s;
+}
+.forward-close-btn:hover { background: #f5f5f5; }

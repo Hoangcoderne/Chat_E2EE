@@ -1,6 +1,12 @@
 // src/models/Message.js
 const mongoose = require('mongoose');
 
+// Mỗi reaction: emoji + userId (1 user chỉ được 1 reaction / tin nhắn)
+const ReactionSchema = new mongoose.Schema({
+    emoji:  { type: String, required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
+}, { _id: false });
+
 const MessageSchema = new mongoose.Schema({
     sender: {
         type: mongoose.Schema.Types.ObjectId,
@@ -13,43 +19,26 @@ const MessageSchema = new mongoose.Schema({
         required: true
     },
 
-    // Nội dung tin nhắn đã mã hóa (AES-GCM ciphertext)
-    encryptedContent: {
-        type: String,
-        required: true
-    },
+    // Nội dung đã mã hoá (AES-GCM ciphertext)
+    encryptedContent: { type: String, required: true },
+    iv:               { type: String, required: true },
 
-    // Initialization Vector — bắt buộc với AES-GCM, duy nhất mỗi tin
-    iv: {
-        type: String,
-        required: true
-    },
-
-    // Chữ ký số ECDSA — ký trên plaintext trước khi mã hóa
+    // Chữ ký số ECDSA — ký trên plaintext trước khi mã hoá
     // required: false để không break tin nhắn cũ chưa có signature
-    signature: {
-        type: String,
-        required: false
-    },
+    signature: { type: String, required: false },
 
-    // [MỚI] Trạng thái đã đọc
-    // true  = recipient đã mở chat và nhìn thấy tin này
-    // false = chưa đọc (mặc định)
-    read: {
-        type: Boolean,
-        default: false
-    },
+    // Trạng thái đã đọc
+    read: { type: Boolean, default: false },
 
-    timestamp: {
-        type: Date,
-        default: Date.now
-    }
+    // [MỚI] Cảm xúc — mảng reaction, mỗi user chỉ 1 slot
+    reactions: { type: [ReactionSchema], default: [] },
+
+    timestamp: { type: Date, default: Date.now }
 });
 
 // Index tăng tốc query lịch sử chat
 MessageSchema.index({ sender: 1, recipient: 1, timestamp: 1 });
-
-// Index tăng tốc query đếm unread và updateMany khi mark_read
+// Index tăng tốc query đếm unread
 MessageSchema.index({ recipient: 1, read: 1 });
 
 module.exports = mongoose.model('Message', MessageSchema);

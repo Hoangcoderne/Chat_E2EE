@@ -27,6 +27,9 @@ let currentChat = {
 // [MỚI] Theo dõi số tin chưa đọc theo từng contactId
 let unreadCounts = {};
 
+// [MỚI] Tin nhắn đang chờ forward sau khi handshake xong
+let pendingForward = null;
+
 // DOM Elements
 const dom = {
     status: document.getElementById('status-bar'),
@@ -275,6 +278,18 @@ socket.on('response_public_key', async (data) => {
         // [MỚI] Reset badge ngay khi mở chat
         resetUnreadBadge(userId);
 
+        // Nếu có tin đang chờ forward → gửi ngay sau khi handshake
+        if (pendingForward && pendingForward.targetId === userId) {
+            const { text } = pendingForward;
+            pendingForward = null;
+            const sig  = await signMessage(text, myIdentity.signingPrivateKey);
+            const enc  = await encryptMessage(text, currentChat.sharedSecret);
+            socket.emit('send_message', {
+                recipientId: userId, encryptedContent: enc.ciphertext, iv: enc.iv, signature: sig
+            });
+            appendMessage(text, 'sent', null, new Date(), null, true);
+        }
+
     } catch (err) {
         console.error("Lỗi Handshake:", err);
         alert("Lỗi thiết lập mã hóa.");
@@ -412,9 +427,23 @@ socket.on('you_have_been_unblocked', ({ unblockerId }) => {
     }
 });
 
-// [FIX #1] Thêm handler cho system_message — trước đây server emit nhưng client không bắt
+// [FIX #1] Handler system_message
 socket.on('system_message', ({ text }) => {
     appendMessage(text, 'system');
+});
+
+// [MỚI] Tin nhắn bị xoá
+socket.on('message_deleted', ({ messageId }) => {
+    const el = document.querySelector(`.msg-wrapper[data-msg-id="${messageId}"]`);
+    if (el) el.remove();
+});
+
+// [MỚI] Reaction được cập nhật
+socket.on('reaction_updated', ({ messageId, reactions }) => {
+    const wrapper = document.querySelector(`.msg-wrapper[data-msg-id="${messageId}"]`);
+    if (!wrapper) return;
+    const bar = wrapper.querySelector('.reaction-bar');
+    if (bar) renderReactions(bar, reactions);
 });
 
 // [FIX #1] Thêm handler cho request_sent_success
@@ -476,7 +505,7 @@ async function loadChatHistory() {
                     );
                 }
 
-                appendMessage(decryptedText, type, signatureValid, msg.timestamp, msg._id);
+                appendMessage(decryptedText, type, signatureValid, msg.timestamp, msg._id, false, msg.reactions || []);
 
                 // Nếu là tin mình gửi và đã được đọc → hiện ✓✓ ngay
                 if (type === 'sent' && msg.read) {
@@ -687,17 +716,19 @@ function updateRequestUI() {
     });
 }
 
-// [MỚI] appendMessage với timestamp, read status, msgId
+// appendMessage với timestamp, read status, action buttons, reactions
 // isTemp=true: tin vừa gửi, chờ sync từ server để gán msgId thật
-function appendMessage(text, type, signatureValid = null, timestamp = null, msgId = null, isTemp = false) {
+function appendMessage(text, type, signatureValid = null, timestamp = null, msgId = null, isTemp = false, reactions = []) {
     const wrapper = document.createElement('div');
     wrapper.className = 'msg-wrapper ' + (type === 'sent' ? 'wrapper-sent' : type === 'system' ? 'wrapper-system' : 'wrapper-received');
 
     if (msgId)   wrapper.dataset.msgId = msgId;
-    if (isTemp)  wrapper.dataset.temp = 'true';
+    if (isTemp)  wrapper.dataset.temp  = 'true';
+    // Lưu plaintext để forward
+    if (text && type !== 'system') wrapper.dataset.plaintext = text;
 
+    // ── Bubble ──
     const div = document.createElement('div');
-
     if (signatureValid === false) {
         div.classList.add('message', 'msg-received');
         div.style.cssText = 'background:#fff0f0;border:1.5px solid #ffb3b3;color:#cc0000;padding:10px 14px;';
@@ -707,39 +738,335 @@ function appendMessage(text, type, signatureValid = null, timestamp = null, msgI
                 Tin nhắn này có thể đã bị chỉnh sửa hoặc giả mạo.<br>Nội dung bị ẩn để bảo vệ bạn.
             </div>`;
     } else {
-        div.classList.add('message',
-            type === 'sent' ? 'msg-sent' :
-            type === 'system' ? 'system-msg' : 'msg-received');
+        div.classList.add('message', type === 'sent' ? 'msg-sent' : type === 'system' ? 'system-msg' : 'msg-received');
         div.innerText = text;
     }
 
-    wrapper.appendChild(div);
+    // ── Action buttons (hover) — chỉ cho tin thường, không phải system ──
+    if (type !== 'system' && signatureValid !== false) {
+        const actions = document.createElement('div');
+        actions.className = 'msg-actions ' + (type === 'sent' ? 'actions-sent' : 'actions-received');
 
-    // Timestamp + read status (không hiện cho system message)
+        // Nút cảm xúc
+        const emojiBtn = document.createElement('button');
+        emojiBtn.className = 'msg-action-btn';
+        emojiBtn.title = 'Cảm xúc';
+        emojiBtn.textContent = '😊';
+        emojiBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showEmojiPicker(e, wrapper);
+        });
+
+        // Nút 3 chấm
+        const moreBtn = document.createElement('button');
+        moreBtn.className = 'msg-action-btn';
+        moreBtn.title = 'Tùy chọn';
+        moreBtn.textContent = '⋯';
+        moreBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showMsgMenu(e, wrapper, type);
+        });
+
+        // Thứ tự: sent → [⋯ 😊] bên trái bubble | received → [😊 ⋯] bên phải
+        if (type === 'sent') {
+            actions.appendChild(moreBtn);
+            actions.appendChild(emojiBtn);
+        } else {
+            actions.appendChild(emojiBtn);
+            actions.appendChild(moreBtn);
+        }
+
+        // Wrap bubble + actions trong msg-row
+        const row = document.createElement('div');
+        row.className = 'msg-row ' + (type === 'sent' ? 'row-sent' : 'row-received');
+        row.appendChild(actions);
+        row.appendChild(div);
+        wrapper.appendChild(row);
+    } else {
+        wrapper.appendChild(div);
+    }
+
+    // ── Reactions bar ──
+    const reactionBar = document.createElement('div');
+    reactionBar.className = 'reaction-bar ' + (type === 'sent' ? 'rbar-sent' : 'rbar-received');
+    renderReactions(reactionBar, reactions);
+    wrapper.appendChild(reactionBar);
+
+    // ── Timestamp + read status ──
     if (type !== 'system') {
         const meta = document.createElement('div');
         meta.className = 'msg-meta ' + (type === 'sent' ? 'meta-sent' : 'meta-received');
-
-        // Thời gian
         const timeEl = document.createElement('span');
         timeEl.className = 'msg-time';
         timeEl.textContent = formatTime(timestamp || new Date());
         meta.appendChild(timeEl);
-
-        // Trạng thái đọc (chỉ cho tin mình gửi)
         if (type === 'sent') {
             const statusEl = document.createElement('span');
             statusEl.className = 'msg-status';
             statusEl.textContent = '✓';
             meta.appendChild(statusEl);
         }
-
         wrapper.appendChild(meta);
     }
 
     dom.messagesList.appendChild(wrapper);
     dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
     return wrapper;
+}
+
+// ── Render reactions vào một bar ──
+function renderReactions(bar, reactions) {
+    bar.innerHTML = '';
+    if (!reactions || reactions.length === 0) return;
+
+    // Group by emoji
+    const groups = {};
+    reactions.forEach(r => {
+        if (!groups[r.emoji]) groups[r.emoji] = [];
+        groups[r.emoji].push(r.userId);
+    });
+
+    Object.entries(groups).forEach(([emoji, users]) => {
+        const pill = document.createElement('span');
+        pill.className = 'reaction-pill';
+        // Highlight nếu mình đã react emoji này
+        if (users.some(uid => uid === myIdentity.userId || uid.toString() === myIdentity.userId)) {
+            pill.classList.add('my-reaction');
+        }
+        pill.textContent = emoji + (users.length > 1 ? ' ' + users.length : '');
+        pill.title = users.length + ' người';
+        bar.appendChild(pill);
+    });
+}
+
+// ── Emoji picker ──
+const EMOJIS = ['👍','❤️','😂','😮','😢','😡'];
+let activeEmojiPicker = null;
+
+function showEmojiPicker(e, wrapper) {
+    closeAllPopups();
+    const picker = document.createElement('div');
+    picker.className = 'emoji-picker';
+    picker.id = '_emoji_picker';
+
+    EMOJIS.forEach(em => {
+        const btn = document.createElement('button');
+        btn.className = 'emoji-option';
+        btn.textContent = em;
+        btn.addEventListener('click', async (ev) => {
+            ev.stopPropagation();
+            picker.remove();
+            activeEmojiPicker = null;
+            const msgId = wrapper.dataset.msgId;
+            if (!msgId) return;
+            await doToggleReaction(msgId, em, wrapper);
+        });
+        picker.appendChild(btn);
+    });
+
+    // Vị trí: dựa vào nút cảm xúc
+    const btnRect = e.currentTarget.getBoundingClientRect();
+    picker.style.position = 'fixed';
+    picker.style.top  = (btnRect.top - 52) + 'px';
+    picker.style.left = (btnRect.left - 60) + 'px';
+    document.body.appendChild(picker);
+    activeEmojiPicker = picker;
+}
+
+// ── Message options menu (⋯) ──
+let activeMsgMenu = null;
+
+function showMsgMenu(e, wrapper, type) {
+    closeAllPopups();
+    const msgId    = wrapper.dataset.msgId;
+    const isSender = (type === 'sent');
+
+    const menu = document.createElement('div');
+    menu.className = 'msg-options-menu';
+    menu.id = '_msg_options_menu';
+
+    // Chuyển tiếp (cả 2 phía)
+    const fwdBtn = document.createElement('button');
+    fwdBtn.textContent = '↪ Chuyển tiếp';
+    fwdBtn.addEventListener('click', () => {
+        menu.remove(); activeMsgMenu = null;
+        showForwardModal(wrapper);
+    });
+    menu.appendChild(fwdBtn);
+
+    // Gỡ tin nhắn (chỉ sender)
+    if (isSender && msgId) {
+        const delBtn = document.createElement('button');
+        delBtn.className = 'danger';
+        delBtn.textContent = '🗑 Gỡ tin nhắn';
+        delBtn.addEventListener('click', async () => {
+            menu.remove(); activeMsgMenu = null;
+            if (!confirm('Xoá tin nhắn này? Hành động không thể hoàn tác.')) return;
+            await doDeleteMessage(msgId, wrapper);
+        });
+        menu.appendChild(delBtn);
+    }
+
+    const btnRect = e.currentTarget.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    const menuW = 160;
+    let left = btnRect.right - menuW;
+    if (left < 8) left = 8;
+    let top = btnRect.bottom + 4;
+    menu.style.top  = top  + 'px';
+    menu.style.left = left + 'px';
+    document.body.appendChild(menu);
+    activeMsgMenu = menu;
+}
+
+function closeAllPopups() {
+    document.getElementById('_emoji_picker')?.remove();
+    document.getElementById('_msg_options_menu')?.remove();
+    document.getElementById('_forward_modal')?.remove();
+    activeEmojiPicker = null;
+    activeMsgMenu     = null;
+}
+
+// ── Xoá tin nhắn ──
+async function doDeleteMessage(msgId, wrapper) {
+    try {
+        const res = await authFetch('/api/chat/message/delete', {
+            method: 'POST',
+            body: JSON.stringify({ messageId: msgId })
+        });
+        if (!res) return;
+        const data = await res.json();
+        if (!data.success) return alert(data.message || 'Xoá thất bại');
+
+        // Broadcast real-time cho recipient
+        socket.emit('broadcast_delete_message', {
+            messageId: msgId,
+            recipientId: data.recipientId
+        });
+        // Xoá khỏi UI của chính mình
+        wrapper.remove();
+    } catch (err) {
+        console.error('Delete error:', err);
+    }
+}
+
+// ── Toggle reaction ──
+async function doToggleReaction(msgId, emoji, wrapper) {
+    try {
+        const res = await authFetch('/api/chat/message/reaction', {
+            method: 'POST',
+            body: JSON.stringify({ messageId: msgId, emoji })
+        });
+        if (!res) return;
+        const data = await res.json();
+        if (!data.success) return;
+
+        // Cập nhật UI local
+        const bar = wrapper.querySelector('.reaction-bar');
+        if (bar) renderReactions(bar, data.reactions);
+
+        // Broadcast real-time
+        socket.emit('broadcast_reaction', {
+            messageId: msgId,
+            reactions: data.reactions,
+            partnerId: data.partnerId
+        });
+    } catch (err) {
+        console.error('Reaction error:', err);
+    }
+}
+
+// ── Forward modal ──
+function showForwardModal(wrapper) {
+    closeAllPopups();
+    const text = wrapper.dataset.plaintext;
+    if (!text) return alert('Không thể chuyển tiếp tin nhắn này.');
+
+    const modal = document.createElement('div');
+    modal.id = '_forward_modal';
+    modal.className = 'forward-modal-overlay';
+
+    const box = document.createElement('div');
+    box.className = 'forward-modal-box';
+
+    const title = document.createElement('h4');
+    title.textContent = 'Chuyển tiếp tin nhắn';
+    box.appendChild(title);
+
+    const subtitle = document.createElement('p');
+    subtitle.className = 'forward-subtitle';
+    subtitle.textContent = 'Chọn người để gửi:';
+    box.appendChild(subtitle);
+
+    // Danh sách bạn bè từ sidebar
+    const list = document.createElement('ul');
+    list.className = 'forward-contact-list';
+
+    const contacts = document.querySelectorAll('.contact-item[data-status="accepted"]');
+    if (contacts.length === 0) {
+        const li = document.createElement('li');
+        li.textContent = 'Không có bạn bè nào để chuyển tiếp.';
+        li.style.color = '#999';
+        li.style.fontSize = '13px';
+        list.appendChild(li);
+    }
+
+    contacts.forEach(item => {
+        const username = item.dataset.username;
+        const userId   = item.dataset.id;
+        const li = document.createElement('li');
+        li.className = 'forward-contact-item';
+
+        const avatar = document.createElement('span');
+        avatar.className = 'forward-avatar';
+        avatar.textContent = username[0].toUpperCase();
+
+        const name = document.createElement('span');
+        name.textContent = username;
+
+        li.appendChild(avatar);
+        li.appendChild(name);
+        li.addEventListener('click', async () => {
+            modal.remove();
+            await doForwardMessage(text, userId, username);
+        });
+        list.appendChild(li);
+    });
+
+    box.appendChild(list);
+
+    // Nút đóng
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'forward-close-btn';
+    closeBtn.textContent = 'Huỷ';
+    closeBtn.addEventListener('click', () => modal.remove());
+    box.appendChild(closeBtn);
+
+    modal.appendChild(box);
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
+}
+
+// ── Thực hiện forward ──
+async function doForwardMessage(text, targetId, targetUsername) {
+    // Nếu đang chat với người đó thì gửi luôn
+    if (currentChat.partnerId === targetId && currentChat.sharedSecret) {
+        const signature   = await signMessage(text, myIdentity.signingPrivateKey);
+        const encrypted   = await encryptMessage(text, currentChat.sharedSecret);
+        socket.emit('send_message', {
+            recipientId:      targetId,
+            encryptedContent: encrypted.ciphertext,
+            iv:               encrypted.iv,
+            signature
+        });
+        appendMessage(text, 'sent', null, new Date(), null, true);
+        return;
+    }
+
+    // Nếu chưa thiết lập sharedSecret với người đó → cần handshake trước
+    // Lưu pending forward để thực hiện sau khi handshake xong
+    pendingForward = { text, targetId };
+    startHandshake(targetUsername);
 }
 
 // [MỚI] Cập nhật dòng preview "Tin nhắn mới" ở sidebar
@@ -921,10 +1248,15 @@ dom.msgInput.addEventListener('keypress', (e) => {
 });
 
 document.addEventListener('click', (e) => {
-    // [FIX] Không đóng menu nếu click vào chính nút ⋮ hoặc bên trong menu
-    // Trường hợp stopPropagation() không ngăn được document listener
     if (!e.target.closest('.contact-options-btn') && !e.target.closest('.options-menu')) {
         document.querySelectorAll('.options-menu').forEach(el => el.classList.add('hidden'));
+    }
+    // Đóng emoji picker và msg options menu khi click ra ngoài
+    if (!e.target.closest('.msg-action-btn') && !e.target.closest('.emoji-picker') && !e.target.closest('.msg-options-menu')) {
+        document.getElementById('_emoji_picker')?.remove();
+        document.getElementById('_msg_options_menu')?.remove();
+        activeEmojiPicker = null;
+        activeMsgMenu     = null;
     }
     if (!dom.reqPopup.contains(e.target) && e.target !== dom.btnRequests) {
         dom.reqPopup.classList.add('hidden');

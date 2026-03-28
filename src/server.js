@@ -266,6 +266,29 @@ io.on('connection', (socket) => {
         }
     });
 
+
+    // [MỚI] 3c. Broadcast xoá tin nhắn real-time
+    // HTTP handler (chatController.deleteMessage) đã xoá DB và trả về recipientId
+    // Client gọi socket này SAU KHI HTTP delete thành công để broadcast UI update
+    socket.on('broadcast_delete_message', ({ messageId, recipientId }) => {
+        if (!socket.userId) return;
+        // Thông báo cho recipient xoá tin khỏi UI
+        io.to(recipientId).emit('message_deleted', { messageId });
+        // Đồng bộ các thiết bị khác của sender
+        io.to(socket.userId).emit('message_deleted', { messageId });
+    });
+
+    // [MỚI] 3d. Broadcast reaction real-time
+    // HTTP handler (chatController.toggleReaction) đã cập nhật DB
+    // Client gọi socket này SAU KHI HTTP thành công để broadcast
+    socket.on('broadcast_reaction', ({ messageId, reactions, partnerId }) => {
+        if (!socket.userId) return;
+        // Gửi cho partner
+        io.to(partnerId).emit('reaction_updated', { messageId, reactions });
+        // Đồng bộ các thiết bị khác của chính mình
+        io.to(socket.userId).emit('reaction_updated', { messageId, reactions });
+    });
+
     // 4. User ngắt kết nối
     socket.on('disconnect', () => {
         if (socket.userId) {
