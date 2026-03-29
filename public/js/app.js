@@ -281,6 +281,11 @@ socket.on('response_public_key', async (data) => {
             sharedSecret: sharedKey
         };
 
+        // [FIX BUG 2] Ẩn nút manage group và clear groupId khi chuyển sang DM
+        currentGroupId = null;
+        dom.btnManageGroup?.classList.add('hidden');
+        dom.msgInput.placeholder = 'Nhập tin nhắn';
+
         updateHeaderStatus(userId);
         dom.chatHeader.classList.remove('hidden');
         dom.partnerName.innerText = username || dom.searchInput.value;
@@ -373,10 +378,11 @@ socket.on('message_sent_sync', async (payload) => {
     }
 });
 
-// [MỚI] B3. Nhận thông báo tin đã được đọc (partner đọc tin mình gửi)
+// B3. Nhận thông báo tin đã được đọc (DM only)
 socket.on('messages_read', ({ by }) => {
-    if (currentChat.partnerId !== by) return;
-    // Cập nhật tất cả ✓ → ✓✓ xanh trong cuộc chat hiện tại
+    // [FIX BUG 5] Chỉ xử lý khi đang ở DM chat, không phải group
+    if (!currentChat.partnerId || currentChat.partnerId !== by) return;
+    if (currentGroupId) return; // đang xem group → bỏ qua
     document.querySelectorAll('.msg-wrapper .msg-status').forEach(el => {
         el.textContent = '✓✓';
         el.classList.add('read');
@@ -969,10 +975,16 @@ async function doDeleteMessage(msgId, wrapper) {
     }
 }
 
-// ── Toggle reaction ──
+// ── Toggle reaction (DM + Group) ──
 async function doToggleReaction(msgId, emoji, wrapper) {
     try {
-        const res = await authFetch('/api/chat/message/reaction', {
+        // [FIX BUG 5] Phân biệt group message và DM message
+        const isGroupMsg = !!currentGroupId;
+        const endpoint   = isGroupMsg
+            ? `/api/groups/message/reaction`
+            : `/api/chat/message/reaction`;
+
+        const res = await authFetch(endpoint, {
             method: 'POST',
             body: JSON.stringify({ messageId: msgId, emoji })
         });
@@ -985,11 +997,19 @@ async function doToggleReaction(msgId, emoji, wrapper) {
         if (bar) renderReactions(bar, data.reactions);
 
         // Broadcast real-time
-        socket.emit('broadcast_reaction', {
-            messageId: msgId,
-            reactions: data.reactions,
-            partnerId: data.partnerId
-        });
+        if (isGroupMsg) {
+            socket.emit('broadcast_group_reaction', {
+                groupId:   currentGroupId,
+                messageId: msgId,
+                reactions: data.reactions
+            });
+        } else {
+            socket.emit('broadcast_reaction', {
+                messageId: msgId,
+                reactions: data.reactions,
+                partnerId: data.partnerId
+            });
+        }
     } catch (err) {
         console.error('Reaction error:', err);
     }
@@ -1582,8 +1602,23 @@ socket.on('group_member_added', ({ groupId, newMember }) => {
 });
 
 socket.on('group_member_removed', ({ groupId, removedUserId }) => {
+    // [FIX BUG 4] Cập nhật sidebar member count
+    authFetch(`/api/groups/${groupId}/info`).then(async res => {
+        if (!res) return;
+        const g = await res.json();
+        const previewEl = document.getElementById(`group-preview-${groupId}`);
+        if (previewEl) previewEl.textContent = `${g.members?.length || 0} thành viên`;
+    });
+
     if (currentGroupId === groupId && removedUserId !== myIdentity.userId) {
         appendMessage('Một thành viên đã rời nhóm', 'system');
+        // Cập nhật header status
+        authFetch(`/api/groups/${groupId}/info`).then(async res => {
+            if (!res) return;
+            const g = await res.json();
+            dom.partnerStatus.innerText = `${g.members?.length || 0} thành viên`;
+        });
+        // Reload manage modal nếu đang mở
         if (!dom.modalManageGroup.classList.contains('hidden')) loadManageModal(groupId);
     }
 });
@@ -1778,49 +1813,69 @@ document.getElementById('btn-add-member')?.addEventListener('click', addSelected
 async function loadManageModal(groupId) {
     document.getElementById('manage-group-error').classList.add('hidden');
 
-    const res  = await authFetch(`/api/groups/${groupId}/info`);
+    const res = await authFetch(`/api/groups/${groupId}/info`);
     if (!res) return;
     const group = await res.json();
 
-    document.getElementById('manage-group-title').textContent = `⚙️ ${group.name}`;
-    document.getElementById('member-count').textContent = group.members?.length || 0;
+    if (!group || !group._id) {
+        document.getElementById('manage-group-error').textContent = 'Không thể tải thông tin nhóm.';
+        document.getElementById('manage-group-error').classList.remove('hidden');
+        return;
+    }
 
-    const isAdmin = group.admins?.some(a => (a._id || a).toString() === myIdentity.userId);
+    document.getElementById('manage-group-title').textContent = `⚙️ ${group.name}`;
+
+    const members = group.members || [];
+    document.getElementById('member-count').textContent = members.length;
+
+    // creatorId là ObjectId string (chưa populate)
+    const creatorId = group.creator?._id?.toString() || group.creator?.toString();
+    const myId      = myIdentity.userId?.toString();
+
+    // admins có thể là array ObjectId hoặc array object {_id, username}
+    const adminIds  = (group.admins || []).map(a => (a._id || a).toString());
+    const isAdmin   = adminIds.includes(myId);
+
     const memberList = document.getElementById('member-list');
     memberList.innerHTML = '';
 
-    group.members?.forEach(m => {
-        const userId   = m.userId?._id || m.userId;
-        const username = m.userId?.username || '?';
-        const isCreator = userId?.toString() === group.creator?.toString();
-        const isThisAdmin = group.admins?.some(a => (a._id || a).toString() === userId?.toString());
+    if (members.length === 0) {
+        memberList.innerHTML = '<li style="color:#999;font-size:13px;padding:8px">Không có thành viên nào.</li>';
+    } else {
+        members.forEach(m => {
+            // Sau khi populate: m.userId = { _id, username, publicKey }
+            // Trước khi populate: m.userId = ObjectId string
+            const uid      = (m.userId?._id || m.userId)?.toString();
+            const username = m.userId?.username || '(unknown)';
+            const isCreator    = uid === creatorId;
+            const isThisAdmin  = adminIds.includes(uid);
 
-        const li = document.createElement('li');
-        li.className = 'member-list-item';
+            const li   = document.createElement('li');
+            li.className = 'member-list-item';
 
-        const left = document.createElement('div');
-        left.className = 'member-list-left';
-        left.innerHTML = `
-            <div class="member-avatar">${username[0].toUpperCase()}</div>
-            <div>
-                <div class="member-name">${username}</div>
-                ${isCreator ? '<div class="member-role creator">Trưởng nhóm</div>' : isThisAdmin ? '<div class="member-role admin">Quản trị</div>' : ''}
-            </div>
-        `;
+            const left = document.createElement('div');
+            left.className = 'member-list-left';
+            left.innerHTML = `
+                <div class="member-avatar">${username[0].toUpperCase()}</div>
+                <div>
+                    <div class="member-name">${username}</div>
+                    ${isCreator    ? '<div class="member-role creator">Trưởng nhóm</div>'
+                    : isThisAdmin  ? '<div class="member-role admin">Quản trị</div>' : ''}
+                </div>
+            `;
+            li.appendChild(left);
 
-        li.appendChild(left);
-
-        // Nút xoá (admin only, không xoá creator hoặc chính mình)
-        if (isAdmin && !isCreator && userId?.toString() !== myIdentity.userId) {
-            const removeBtn = document.createElement('button');
-            removeBtn.className = 'btn-remove-member';
-            removeBtn.textContent = 'Xoá';
-            removeBtn.addEventListener('click', () => removeMemberFromGroup(groupId, userId?.toString(), username));
-            li.appendChild(removeBtn);
-        }
-
-        memberList.appendChild(li);
-    });
+            // Nút xoá (admin only, không xoá creator hoặc chính mình)
+            if (isAdmin && !isCreator && uid !== myId) {
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'btn-remove-member';
+                removeBtn.textContent = 'Xoá';
+                removeBtn.addEventListener('click', () => removeMemberFromGroup(groupId, uid, username));
+                li.appendChild(removeBtn);
+            }
+            memberList.appendChild(li);
+        });
+    }
 
     // Section thêm thành viên (admin only)
     const addSection = document.getElementById('add-member-section');

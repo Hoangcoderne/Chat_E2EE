@@ -11,7 +11,20 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
 
 /* Chat Area */
 .chat-area { flex: 1; display: flex; flex-direction: column; background: white; }
-.chat-header { padding: 15px; background: #e3f2fd; border-bottom: 1px solid #ddd; color: #0d47a1; }
+.chat-header {
+    padding: 15px;
+    background: #e3f2fd;
+    border-bottom: 1px solid #ddd;
+    color: #0d47a1;
+    display: flex;              /* [FIX BUG 1] flex để đẩy icon sang phải */
+    align-items: center;
+    justify-content: space-between;
+}
+.header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
 .messages-list { flex: 1; padding: 20px; overflow-y: auto; background: #fafafa; display: flex; flex-direction: column; gap: 10px; }
 .chat-input-area { padding: 20px; border-top: 1px solid #ddd; display: flex; gap: 10px; }
 .chat-input-area input { flex: 1; padding: 10px; font-size: 16px; }

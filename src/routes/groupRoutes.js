@@ -27,4 +27,7 @@ router.post('/:groupId/add-member',    authMiddleware, groupController.addMember
 router.post('/:groupId/remove-member', authMiddleware, groupController.removeMember);
 router.post('/:groupId/leave',         authMiddleware, groupController.leaveGroup);
 
+// Toggle reaction cho group message
+router.post('/message/reaction', authMiddleware, groupController.toggleGroupReaction);
+
 module.exports = router;

@@ -283,3 +283,45 @@ exports.getGroupInfo = async (req, res) => {
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
+
+// ── [FIX BUG 5] Toggle reaction cho group message ─────────────
+// POST /api/groups/message/reaction
+exports.toggleGroupReaction = async (req, res) => {
+    try {
+        const { messageId, emoji } = req.body;
+        const currentUserId = req.user.userId;
+
+        if (!messageId || !mongoose.Types.ObjectId.isValid(messageId))
+            return res.status(400).json({ success: false, message: 'messageId không hợp lệ.' });
+
+        const VALID = ['👍','❤️','😂','😮','😢','😡'];
+        if (!VALID.includes(emoji))
+            return res.status(400).json({ success: false, message: 'Emoji không hợp lệ.' });
+
+        const GroupMessage = require('../models/GroupMessage');
+        const msg = await GroupMessage.findById(messageId);
+        if (!msg) return res.status(404).json({ success: false, message: 'Tin nhắn không tồn tại.' });
+
+        // Kiểm tra user có trong nhóm không
+        const group = await Group.findById(msg.groupId);
+        if (!group || !isMember(group, currentUserId))
+            return res.status(403).json({ success: false, message: 'Không có quyền react.' });
+
+        const existing = msg.reactions.find(r => r.userId.toString() === currentUserId);
+        if (existing) {
+            if (existing.emoji === emoji) {
+                msg.reactions = msg.reactions.filter(r => r.userId.toString() !== currentUserId);
+            } else {
+                existing.emoji = emoji;
+            }
+        } else {
+            msg.reactions.push({ emoji, userId: currentUserId });
+        }
+        await msg.save();
+
+        res.json({ success: true, reactions: msg.reactions, messageId, groupId: msg.groupId.toString() });
+    } catch (err) {
+        console.error('Toggle group reaction error:', err);
+        res.status(500).json({ success: false, message: 'Lỗi server.' });
+    }
+};

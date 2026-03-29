@@ -359,6 +359,13 @@ io.on('connection', (socket) => {
         io.to(removedUserId).emit('group_kicked', { groupId });
     });
 
+    // Broadcast group reaction
+    socket.on('broadcast_group_reaction', ({ groupId, messageId, reactions }) => {
+        if (!socket.userId) return;
+        // Gửi tới tất cả member trong nhóm (trừ sender — đã update local)
+        socket.to('group:' + groupId).emit('reaction_updated', { messageId, reactions });
+    });
+
     socket.on('broadcast_group_left', ({ groupId }) => {
         if (!socket.userId) return;
         socket.to('group:' + groupId).emit('group_member_removed', {
