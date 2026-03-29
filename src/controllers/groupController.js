@@ -5,11 +5,17 @@ const GroupMessage = require('../models/GroupMessage');
 const User         = require('../models/User');
 
 // ── Helper ────────────────────────────────────────────────────
+// Lưu ý: sau khi .populate('members.userId'), m.userId là object {_id,...}
+// Trước populate: m.userId là ObjectId → .toString() trả về id string
+// Cần xử lý cả 2 trường hợp
 function isAdmin(group, userId) {
-    return group.admins.some(id => id.toString() === userId);
+    return group.admins.some(a => (a._id || a).toString() === userId.toString());
 }
 function isMember(group, userId) {
-    return group.members.some(m => m.userId.toString() === userId);
+    return group.members.some(m => {
+        const mid = m.userId?._id || m.userId; // populated hoặc chưa
+        return mid?.toString() === userId.toString();
+    });
 }
 
 // ── Lấy public key nhiều user cùng lúc (để client mã hoá group key) ──
@@ -270,16 +276,25 @@ exports.getGroupInfo = async (req, res) => {
         const userId  = req.user.userId;
         const { groupId } = req.params;
 
+        if (!mongoose.Types.ObjectId.isValid(groupId))
+            return res.status(400).json({ message: 'groupId không hợp lệ' });
+
+        // Bước 1: Kiểm tra membership TRƯỚC khi populate
+        // (isMember dùng m.userId là ObjectId — chính xác)
+        const groupRaw = await Group.findById(groupId);
+        if (!groupRaw)
+            return res.status(404).json({ message: 'Nhóm không tồn tại' });
+        if (!isMember(groupRaw, userId))
+            return res.status(403).json({ message: 'Bạn không phải thành viên nhóm này' });
+
+        // Bước 2: Lấy lại với populate để trả về đầy đủ thông tin
         const group = await Group.findById(groupId)
             .populate('members.userId', 'username _id publicKey')
-            .populate('admins', 'username _id');
-
-        if (!group || !isMember(group, userId))
-            return res.status(403).json({ message: 'Không có quyền truy cập' });
+            .populate('admins', '_id username');
 
         res.json(group);
     } catch (err) {
-        console.error(err);
+        console.error('getGroupInfo error:', err);
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
