@@ -28,8 +28,11 @@ const { apiLimiter, authLimiter, registerLimiter, resetLimiter } = require('./mi
 const Message = require('./models/Message');
 const User = require('./models/User');
 const Friendship = require('./models/Friendship');
-const authRoutes = require('./routes/authRoutes');
-const chatRoutes = require('./routes/chatRoutes');
+const authRoutes  = require('./routes/authRoutes');
+const chatRoutes  = require('./routes/chatRoutes');
+const groupRoutes = require('./routes/groupRoutes');  // [MỚI]
+const GroupMessage = require('./models/GroupMessage'); // [MỚI]
+const Group        = require('./models/Group');        // [MỚI]
 
 const app = express();
 const server = http.createServer(app);
@@ -109,8 +112,9 @@ app.use('/api/', apiLimiter); // Giới hạn chung cho toàn bộ API
 // ══════════════════════════════════════════════════
 // ROUTES
 // ══════════════════════════════════════════════════
-app.use('/api/auth', authRoutes);
-app.use('/api/chat', chatRoutes);
+app.use('/api/auth',   authRoutes);
+app.use('/api/chat',   chatRoutes);
+app.use('/api/groups', groupRoutes); // [MỚI]
 
 // ══════════════════════════════════════════════════
 // [MỚI] GLOBAL ERROR HANDLER
@@ -287,6 +291,80 @@ io.on('connection', (socket) => {
         io.to(partnerId).emit('reaction_updated', { messageId, reactions });
         // Đồng bộ các thiết bị khác của chính mình
         io.to(socket.userId).emit('reaction_updated', { messageId, reactions });
+    });
+
+    // [MỚI] 3e. Join tất cả group rooms của user khi kết nối
+    socket.on('join_groups', async (groupIds) => {
+        if (!Array.isArray(groupIds)) return;
+        groupIds.forEach(gid => socket.join('group:' + gid));
+    });
+
+    // [MỚI] 3f. Gửi tin nhắn nhóm E2EE
+    socket.on('send_group_message', async ({ groupId, encryptedContent, iv, signature }) => {
+        try {
+            if (!socket.userId)
+                return socket.emit('error', 'Phiên kết nối bị gián đoạn.');
+
+            // Kiểm tra user có trong nhóm không
+            const group = await Group.findById(groupId);
+            if (!group || !group.members.some(m => m.userId.toString() === socket.userId))
+                return socket.emit('error', 'Bạn không trong nhóm này.');
+
+            const msg = await GroupMessage.create({
+                groupId,
+                sender: socket.userId,
+                encryptedContent,
+                iv,
+                signature: signature || null,
+                readBy: [socket.userId]  // sender đã đọc
+            });
+
+            const payload = {
+                messageId:        msg._id.toString(),
+                groupId,
+                senderId:         socket.userId,
+                senderName:       socket.username,
+                encryptedContent,
+                iv,
+                signature:        signature || null,
+                timestamp:        msg.timestamp
+            };
+
+            // Broadcast tới toàn bộ nhóm (trừ sender)
+            socket.to('group:' + groupId).emit('receive_group_message', payload);
+            // Sync tới thiết bị khác của sender
+            io.to(socket.userId).emit('group_message_sent_sync', {
+                ...payload,
+                senderSocketId: socket.id
+            });
+
+        } catch (err) {
+            logger.error({ event: 'socket_error', handler: 'send_group_message', error: err.message });
+        }
+    });
+
+    // [MỚI] 3g. Thông báo khi admin thêm/xoá thành viên (broadcast real-time)
+    socket.on('broadcast_group_member_added', ({ groupId, newMember, groupName }) => {
+        if (!socket.userId) return;
+        // Thông báo toàn nhóm cũ
+        socket.to('group:' + groupId).emit('group_member_added', { groupId, newMember });
+        // Mời member mới join room nhóm
+        io.to(newMember._id).emit('group_invited', { groupId, groupName });
+    });
+
+    socket.on('broadcast_group_member_removed', ({ groupId, removedUserId }) => {
+        if (!socket.userId) return;
+        io.to('group:' + groupId).emit('group_member_removed', { groupId, removedUserId });
+        // Kick user khỏi room
+        io.to(removedUserId).emit('group_kicked', { groupId });
+    });
+
+    socket.on('broadcast_group_left', ({ groupId }) => {
+        if (!socket.userId) return;
+        socket.to('group:' + groupId).emit('group_member_removed', {
+            groupId, removedUserId: socket.userId
+        });
+        socket.leave('group:' + groupId);
     });
 
     // 4. User ngắt kết nối

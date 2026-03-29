@@ -1,7 +1,8 @@
 // public/js/app.js
 import {
     importPublicKey, deriveSharedSecret, encryptMessage, decryptMessage,
-    signMessage, verifySignature, importSigningPublicKey
+    signMessage, verifySignature, importSigningPublicKey,
+    arrayBufferToBase64, base64ToArrayBuffer
 } from './crypto/key-manager.js';
 
 // ============================================================
@@ -30,6 +31,11 @@ let unreadCounts = {};
 // [MỚI] Tin nhắn đang chờ forward sau khi handshake xong
 let pendingForward = null;
 
+// ── Group chat state ──
+let currentGroupId = null;   // groupId đang mở
+// groupKeys: Map<groupId, CryptoKey>  — cache group keys đã giải mã
+const groupKeys = new Map();
+
 // DOM Elements
 const dom = {
     status: document.getElementById('status-bar'),
@@ -49,15 +55,28 @@ const dom = {
     reqList: document.getElementById('requests-list'),
     reqCount: document.getElementById('req-count'),
     chatInputArea: document.getElementById('chat-input-area'),
-    blockOverlay: document.getElementById('block-overlay'),
-    blockTitle: document.getElementById('block-title'),
-    btnUnblock: document.getElementById('btn-unblock')
+    blockOverlay:        document.getElementById('block-overlay'),
+    blockTitle:          document.getElementById('block-title'),
+    btnUnblock:          document.getElementById('btn-unblock'),
+    // Group elements
+    tabFriends:          document.getElementById('tab-friends'),
+    tabGroups:           document.getElementById('tab-groups'),
+    panelFriends:        document.getElementById('panel-friends'),
+    panelGroups:         document.getElementById('panel-groups'),
+    groupsList:          document.getElementById('groups-list'),
+    btnCreateGroup:      document.getElementById('btn-create-group'),
+    btnManageGroup:      document.getElementById('btn-manage-group'),
+    modalCreateGroup:    document.getElementById('modal-create-group'),
+    modalManageGroup:    document.getElementById('modal-manage-group')
 };
 
 socket.on('connect', () => {
     const userId = sessionStorage.getItem('userId');
     if (userId) {
         socket.emit('join_user', userId);
+        // Rejoin group rooms sau reconnect
+        const cachedGroupIds = JSON.parse(sessionStorage.getItem('myGroupIds') || '[]');
+        if (cachedGroupIds.length > 0) socket.emit('join_groups', cachedGroupIds);
         console.log("Đã phục hồi định danh Socket sau khi reconnect.");
     }
 });
@@ -1282,3 +1301,624 @@ dom.btnConnect.addEventListener('click', () => {
 
 // CHẠY INIT
 initApp();
+
+// ============================================================
+// ══ GROUP CHAT MODULE ══
+// ============================================================
+
+// ── Crypto helpers cho group key ──
+
+// Mã hoá group key bằng ECDH shared secret với một member
+async function encryptGroupKeyForMember(groupKey, memberPublicKeyBase64) {
+    const memberPubKey  = await importPublicKey(memberPublicKeyBase64);
+    const sharedSecret  = await deriveSharedSecret(myIdentity.privateKey, memberPubKey);
+    const rawKey        = await window.crypto.subtle.exportKey('raw', groupKey);
+    const iv            = window.crypto.getRandomValues(new Uint8Array(12));
+    const encrypted     = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv }, sharedSecret, rawKey);
+    return { encryptedGroupKey: arrayBufferToBase64(encrypted), keyIv: arrayBufferToBase64(iv) };
+}
+
+// Giải mã group key nhận từ server
+async function decryptGroupKey(encryptedGroupKeyB64, keyIvB64, keyHolderPublicKeyB64) {
+    const keyHolderPub = await importPublicKey(keyHolderPublicKeyB64);
+    const sharedSecret = await deriveSharedSecret(myIdentity.privateKey, keyHolderPub);
+    const iv           = base64ToArrayBuffer(keyIvB64);
+    const data         = base64ToArrayBuffer(encryptedGroupKeyB64);
+    const rawKey       = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv }, sharedSecret, data);
+    return await window.crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+// Lấy group key (từ cache hoặc fetch + decrypt)
+async function getGroupKey(groupId) {
+    if (groupKeys.has(groupId)) return groupKeys.get(groupId);
+
+    const res  = await authFetch(`/api/groups/${groupId}/my-key`);
+    if (!res) return null;
+    const data = await res.json();
+    if (!data.encryptedGroupKey) return null;
+
+    const key = await decryptGroupKey(data.encryptedGroupKey, data.keyIv, data.keyHolderPublicKey);
+    groupKeys.set(groupId, key);
+    return key;
+}
+
+// ── Load & render groups ──
+async function loadGroups() {
+    try {
+        const res = await authFetch('/api/groups');
+        if (!res) return;
+        const groups = await res.json();
+
+        // Cache group IDs để rejoin sau reconnect
+        sessionStorage.setItem('myGroupIds', JSON.stringify(groups.map(g => g._id)));
+        socket.emit('join_groups', groups.map(g => g._id));
+
+        dom.groupsList.innerHTML = '';
+        groups.forEach(g => renderGroupItem(g));
+    } catch (err) {
+        console.error('loadGroups error:', err);
+    }
+}
+
+function renderGroupItem(group) {
+    if (document.querySelector(`.group-item[data-group-id="${group._id}"]`)) return;
+
+    const li = document.createElement('li');
+    li.className = 'contact-item group-item';
+    li.dataset.groupId = group._id;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar-container';
+    avatar.innerHTML = `<div class="avatar group-avatar">${group.name[0].toUpperCase()}</div>`;
+
+    const info = document.createElement('div');
+    info.className = 'contact-info';
+    info.innerHTML = `
+        <div class="contact-name">${group.name}</div>
+        <div class="last-message" id="group-preview-${group._id}">${group.members?.length || 0} thành viên</div>
+    `;
+
+    const badge = document.createElement('span');
+    badge.className = 'unread-badge hidden';
+    badge.id = `unread-group-${group._id}`;
+    if (group.unreadCount > 0) {
+        badge.textContent = group.unreadCount > 99 ? '99+' : group.unreadCount;
+        badge.classList.remove('hidden');
+    }
+
+    li.appendChild(avatar);
+    li.appendChild(info);
+    li.appendChild(badge);
+    li.addEventListener('click', () => openGroupChat(group));
+    dom.groupsList.appendChild(li);
+}
+
+// ── Mở group chat ──
+async function openGroupChat(group) {
+    currentGroupId = group._id;
+    currentChat = { partnerId: null, partnerPublicKey: null, partnerSigningPublicKey: null, sharedSecret: null };
+
+    // Highlight
+    document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
+    document.querySelector(`.group-item[data-group-id="${group._id}"]`)?.classList.add('active');
+
+    // Header
+    dom.chatHeader.classList.remove('hidden');
+    dom.partnerName.innerText  = `👥 ${group.name}`;
+    dom.partnerStatus.innerText = `${group.members?.length || '?'} thành viên`;
+    dom.partnerStatus.classList.remove('online');
+
+    // Hiện nút quản lý nhóm
+    dom.btnManageGroup.classList.remove('hidden');
+    dom.btnManageGroup.dataset.groupId = group._id;
+
+    // Enable input
+    dom.chatInputArea.classList.remove('hidden');
+    dom.blockOverlay.classList.add('hidden');
+    dom.msgInput.disabled  = false;
+    dom.btnSend.disabled   = false;
+    dom.msgInput.placeholder = 'Nhắn tin vào nhóm...';
+
+    // Clear messages
+    dom.messagesList.innerHTML = '<div class="system-msg">🔒 Đang tải lịch sử nhóm...</div>';
+
+    // Load group key
+    try {
+        await getGroupKey(group._id);
+    } catch (e) {
+        dom.messagesList.innerHTML = '<div class="system-msg">⚠️ Không thể tải khoá nhóm. Vui lòng thử lại.</div>';
+        return;
+    }
+
+    // Load history
+    await loadGroupHistory(group._id);
+
+    // Reset badge
+    const badge = document.getElementById(`unread-group-${group._id}`);
+    if (badge) { badge.textContent = ''; badge.classList.add('hidden'); }
+}
+
+// ── Load group message history ──
+async function loadGroupHistory(groupId) {
+    try {
+        const res = await authFetch(`/api/groups/${groupId}/history`);
+        if (!res) return;
+        const messages = await res.json();
+
+        dom.messagesList.innerHTML = '';
+        if (messages.length === 0) {
+            dom.messagesList.innerHTML = '<div class="system-msg">Chưa có tin nhắn nào trong nhóm.</div>';
+            return;
+        }
+
+        const groupKey = await getGroupKey(groupId);
+        if (!groupKey) return;
+
+        for (const msg of messages) {
+            try {
+                const text = await decryptMessage({ ciphertext: msg.encryptedContent, iv: msg.iv }, groupKey);
+                const isMine = msg.sender._id === myIdentity.userId || msg.sender._id?.toString() === myIdentity.userId;
+                const type   = isMine ? 'sent' : 'received';
+                const wrapper = appendMessage(text, type, null, msg.timestamp, msg._id, false, msg.reactions || []);
+                // Hiện tên người gửi cho tin nhận
+                if (!isMine && wrapper) {
+                    const senderLabel = document.createElement('div');
+                    senderLabel.className = 'group-sender-label';
+                    senderLabel.textContent = msg.sender.username || '';
+                    wrapper.insertBefore(senderLabel, wrapper.firstChild);
+                }
+            } catch (e) {
+                appendMessage('[Lỗi giải mã]', 'system');
+            }
+        }
+        dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
+    } catch (err) {
+        console.error('loadGroupHistory error:', err);
+    }
+}
+
+// ── Gửi tin nhắn nhóm ──
+async function sendGroupMessage() {
+    const text = dom.msgInput.value.trim();
+    if (!text || !currentGroupId) return;
+
+    const groupKey = groupKeys.get(currentGroupId);
+    if (!groupKey) { alert('Chưa có khoá nhóm. Vui lòng thử lại.'); return; }
+
+    try {
+        const signature   = await signMessage(text, myIdentity.signingPrivateKey);
+        const encrypted   = await encryptMessage(text, groupKey);
+
+        socket.emit('send_group_message', {
+            groupId:          currentGroupId,
+            encryptedContent: encrypted.ciphertext,
+            iv:               encrypted.iv,
+            signature
+        });
+
+        appendMessage(text, 'sent', null, new Date(), null, true);
+        dom.msgInput.value = '';
+    } catch (err) {
+        console.error('sendGroupMessage error:', err);
+        alert('Không thể gửi tin nhắn nhóm.');
+    }
+}
+
+// ── Socket events cho group ──
+socket.on('receive_group_message', async (payload) => {
+    const { groupId, senderId, senderName, encryptedContent, iv, reactions, timestamp, messageId } = payload;
+
+    // Cập nhật preview sidebar
+    const previewEl = document.getElementById(`group-preview-${groupId}`);
+    if (previewEl) previewEl.textContent = `${senderName}: tin nhắn mới`;
+
+    if (currentGroupId !== groupId) {
+        // Tăng badge
+        const badge = document.getElementById(`unread-group-${groupId}`);
+        if (badge) {
+            const cur = parseInt(badge.textContent) || 0;
+            badge.textContent = cur + 1 > 99 ? '99+' : cur + 1;
+            badge.classList.remove('hidden');
+        }
+        return;
+    }
+
+    // Đang xem nhóm này → giải mã và hiện
+    try {
+        const groupKey = await getGroupKey(groupId);
+        const text     = await decryptMessage({ ciphertext: encryptedContent, iv }, groupKey);
+        const wrapper  = appendMessage(text, 'received', null, timestamp, messageId, false, reactions || []);
+        if (wrapper) {
+            const senderLabel = document.createElement('div');
+            senderLabel.className = 'group-sender-label';
+            senderLabel.textContent = senderName;
+            wrapper.insertBefore(senderLabel, wrapper.firstChild);
+        }
+    } catch (e) {
+        appendMessage('[Lỗi giải mã]', 'system');
+    }
+});
+
+socket.on('group_message_sent_sync', async (payload) => {
+    if (payload.senderSocketId === socket.id) {
+        // Cùng socket → gán msgId cho temp message
+        const tempEl = dom.messagesList.querySelector('[data-temp="true"]');
+        if (tempEl) { tempEl.removeAttribute('data-temp'); tempEl.dataset.msgId = payload.messageId; }
+        return;
+    }
+    // Thiết bị khác → hiện tin
+    if (currentGroupId === payload.groupId) {
+        const groupKey = await getGroupKey(payload.groupId);
+        const text = await decryptMessage({ ciphertext: payload.encryptedContent, iv: payload.iv }, groupKey);
+        appendMessage(text, 'sent', null, payload.timestamp, payload.messageId);
+    }
+});
+
+socket.on('group_invited', async ({ groupId, groupName }) => {
+    socket.emit('join_groups', [groupId]);
+    // Thêm nhóm vào sidebar
+    const res = await authFetch(`/api/groups/${groupId}/info`);
+    if (res) { const g = await res.json(); if (g._id) renderGroupItem(g); }
+    appendMessage(`Bạn đã được thêm vào nhóm "${groupName}"`, 'system');
+});
+
+socket.on('group_kicked', ({ groupId }) => {
+    socket.leave?.('group:' + groupId);
+    document.querySelector(`.group-item[data-group-id="${groupId}"]`)?.remove();
+    if (currentGroupId === groupId) {
+        currentGroupId = null;
+        dom.messagesList.innerHTML = '<div class="system-msg">Bạn đã bị xoá khỏi nhóm này.</div>';
+        dom.msgInput.disabled = true; dom.btnSend.disabled = true;
+        dom.btnManageGroup.classList.add('hidden');
+    }
+});
+
+socket.on('group_member_added', ({ groupId, newMember }) => {
+    if (currentGroupId === groupId) {
+        appendMessage(`${newMember.username} đã tham gia nhóm`, 'system');
+        // Reload manage modal nếu đang mở
+        if (!dom.modalManageGroup.classList.contains('hidden')) loadManageModal(groupId);
+    }
+});
+
+socket.on('group_member_removed', ({ groupId, removedUserId }) => {
+    if (currentGroupId === groupId && removedUserId !== myIdentity.userId) {
+        appendMessage('Một thành viên đã rời nhóm', 'system');
+        if (!dom.modalManageGroup.classList.contains('hidden')) loadManageModal(groupId);
+    }
+});
+
+// ── Override sendMessage để phân biệt group / DM ──
+const _originalSendMessage = sendMessage;
+// Patch: btn-send và Enter key check currentGroupId
+dom.btnSend.removeEventListener('click', sendMessage);
+dom.btnSend.addEventListener('click', () => {
+    if (currentGroupId) sendGroupMessage();
+    else sendMessage();
+});
+dom.msgInput.removeEventListener('keypress', null);
+dom.msgInput.addEventListener('keypress', (e) => {
+    if (e.key !== 'Enter') return;
+    if (currentGroupId) sendGroupMessage();
+    else sendMessage();
+});
+
+// ── Tab switching ──
+dom.tabFriends?.addEventListener('click', () => {
+    dom.tabFriends.classList.add('active');
+    dom.tabGroups.classList.remove('active');
+    dom.panelFriends.classList.remove('hidden');
+    dom.panelGroups.classList.add('hidden');
+});
+dom.tabGroups?.addEventListener('click', () => {
+    dom.tabGroups.classList.add('active');
+    dom.tabFriends.classList.remove('active');
+    dom.panelGroups.classList.remove('hidden');
+    dom.panelFriends.classList.add('hidden');
+});
+
+// ── CREATE GROUP MODAL ──
+dom.btnCreateGroup?.addEventListener('click', openCreateGroupModal);
+document.getElementById('btn-close-create-group')?.addEventListener('click', () => dom.modalCreateGroup.classList.add('hidden'));
+document.getElementById('btn-cancel-create-group')?.addEventListener('click', () => dom.modalCreateGroup.classList.add('hidden'));
+document.getElementById('btn-submit-create-group')?.addEventListener('click', submitCreateGroup);
+dom.modalCreateGroup?.addEventListener('click', (e) => { if (e.target === dom.modalCreateGroup) dom.modalCreateGroup.classList.add('hidden'); });
+
+async function openCreateGroupModal() {
+    dom.modalCreateGroup.classList.remove('hidden');
+    document.getElementById('group-name-input').value = '';
+    document.getElementById('create-group-error').classList.add('hidden');
+    document.getElementById('selected-members-preview').classList.add('hidden');
+    document.getElementById('selected-chips').innerHTML = '';
+
+    // Load danh sách bạn bè đã kết bạn
+    const checkboxList = document.getElementById('friend-checkboxes');
+    checkboxList.innerHTML = '<div style="color:#999;font-size:13px">Đang tải...</div>';
+
+    const contacts = [...document.querySelectorAll('.contact-item[data-status="accepted"]')];
+    if (contacts.length === 0) {
+        checkboxList.innerHTML = '<div style="color:#999;font-size:13px">Bạn chưa có bạn bè nào.</div>';
+        return;
+    }
+
+    checkboxList.innerHTML = '';
+    contacts.forEach(item => {
+        const userId   = item.dataset.id;
+        const username = item.dataset.username;
+        const label    = document.createElement('label');
+        label.className = 'friend-checkbox-item';
+        label.innerHTML = `
+            <input type="checkbox" class="member-checkbox" data-id="${userId}" data-name="${username}">
+            <span class="friend-checkbox-avatar">${username[0].toUpperCase()}</span>
+            <span>${username}</span>
+        `;
+        checkboxList.appendChild(label);
+
+        label.querySelector('input').addEventListener('change', updateSelectedPreview);
+    });
+}
+
+function updateSelectedPreview() {
+    const checked = [...document.querySelectorAll('.member-checkbox:checked')];
+    const preview = document.getElementById('selected-members-preview');
+    const chips   = document.getElementById('selected-chips');
+    chips.innerHTML = '';
+    if (checked.length === 0) { preview.classList.add('hidden'); return; }
+    preview.classList.remove('hidden');
+    checked.forEach(cb => {
+        const chip = document.createElement('span');
+        chip.className = 'member-chip';
+        chip.textContent = cb.dataset.name;
+        chips.appendChild(chip);
+    });
+}
+
+async function submitCreateGroup() {
+    const name    = document.getElementById('group-name-input').value.trim();
+    const checked = [...document.querySelectorAll('.member-checkbox:checked')];
+    const errEl   = document.getElementById('create-group-error');
+    errEl.classList.add('hidden');
+
+    if (!name) { errEl.textContent = 'Vui lòng nhập tên nhóm'; errEl.classList.remove('hidden'); return; }
+    if (checked.length === 0) { errEl.textContent = 'Chọn ít nhất 1 thành viên'; errEl.classList.remove('hidden'); return; }
+
+    const btn = document.getElementById('btn-submit-create-group');
+    btn.disabled = true; btn.textContent = 'Đang tạo...';
+
+    try {
+        // Lấy public keys của tất cả members (kể cả mình)
+        const memberIds = checked.map(cb => cb.dataset.id);
+        const allIds    = [...memberIds, myIdentity.userId];
+
+        const keysRes  = await authFetch(`/api/groups/member-keys?userIds=${allIds.join(',')}`);
+        if (!keysRes) throw new Error('Không lấy được public keys');
+        const members  = await keysRes.json(); // [{ _id, username, publicKey }]
+
+        // Generate group key (AES-GCM 256-bit)
+        const groupKey = await window.crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+
+        // Mã hoá group key cho từng member
+        const memberPayloads = await Promise.all(members.map(async m => {
+            const { encryptedGroupKey, keyIv } = await encryptGroupKeyForMember(groupKey, m.publicKey);
+            return { userId: m._id, encryptedGroupKey, keyIv };
+        }));
+
+        // Gọi API tạo nhóm
+        const res  = await authFetch('/api/groups/create', {
+            method: 'POST',
+            body: JSON.stringify({ name, members: memberPayloads })
+        });
+        if (!res) throw new Error('Lỗi mạng');
+        const group = await res.json();
+        if (!group._id) throw new Error(group.message || 'Tạo nhóm thất bại');
+
+        // Cache group key
+        groupKeys.set(group._id, groupKey);
+        // Update cached group IDs
+        const cached = JSON.parse(sessionStorage.getItem('myGroupIds') || '[]');
+        cached.push(group._id);
+        sessionStorage.setItem('myGroupIds', JSON.stringify(cached));
+
+        // Join socket room
+        socket.emit('join_groups', [group._id]);
+
+        // Render group item trong sidebar
+        renderGroupItem({ ...group, members: group.members, unreadCount: 0 });
+
+        // Notify các thành viên
+        socket.emit('broadcast_group_member_added', {
+            groupId: group._id,
+            newMember: { _id: 'all', username: 'all' },
+            groupName: name
+        });
+
+        // Đóng modal và chuyển sang tab nhóm
+        dom.modalCreateGroup.classList.add('hidden');
+        dom.tabGroups?.click();
+        openGroupChat(group);
+
+    } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('hidden');
+    } finally {
+        btn.disabled = false; btn.textContent = 'Tạo nhóm';
+    }
+}
+
+// ── MANAGE GROUP MODAL ──
+dom.btnManageGroup?.addEventListener('click', () => {
+    const groupId = dom.btnManageGroup.dataset.groupId;
+    if (groupId) { dom.modalManageGroup.classList.remove('hidden'); loadManageModal(groupId); }
+});
+document.getElementById('btn-close-manage-group')?.addEventListener('click',   () => dom.modalManageGroup.classList.add('hidden'));
+document.getElementById('btn-close-manage-group-2')?.addEventListener('click', () => dom.modalManageGroup.classList.add('hidden'));
+dom.modalManageGroup?.addEventListener('click', (e) => { if (e.target === dom.modalManageGroup) dom.modalManageGroup.classList.add('hidden'); });
+
+document.getElementById('btn-leave-group')?.addEventListener('click', async () => {
+    if (!currentGroupId) return;
+    if (!confirm('Bạn có chắc muốn rời nhóm này?')) return;
+
+    const res = await authFetch(`/api/groups/${currentGroupId}/leave`, { method: 'POST' });
+    if (!res) return;
+    const data = await res.json();
+    if (data.success) {
+        socket.emit('broadcast_group_left', { groupId: currentGroupId });
+        document.querySelector(`.group-item[data-group-id="${currentGroupId}"]`)?.remove();
+        groupKeys.delete(currentGroupId);
+        currentGroupId = null;
+        dom.modalManageGroup.classList.add('hidden');
+        dom.btnManageGroup.classList.add('hidden');
+        dom.messagesList.innerHTML = '<div class="system-msg">Bạn đã rời nhóm.</div>';
+        dom.msgInput.disabled = true; dom.btnSend.disabled = true;
+    }
+});
+
+document.getElementById('btn-add-member')?.addEventListener('click', addSelectedMembers);
+
+async function loadManageModal(groupId) {
+    document.getElementById('manage-group-error').classList.add('hidden');
+
+    const res  = await authFetch(`/api/groups/${groupId}/info`);
+    if (!res) return;
+    const group = await res.json();
+
+    document.getElementById('manage-group-title').textContent = `⚙️ ${group.name}`;
+    document.getElementById('member-count').textContent = group.members?.length || 0;
+
+    const isAdmin = group.admins?.some(a => (a._id || a).toString() === myIdentity.userId);
+    const memberList = document.getElementById('member-list');
+    memberList.innerHTML = '';
+
+    group.members?.forEach(m => {
+        const userId   = m.userId?._id || m.userId;
+        const username = m.userId?.username || '?';
+        const isCreator = userId?.toString() === group.creator?.toString();
+        const isThisAdmin = group.admins?.some(a => (a._id || a).toString() === userId?.toString());
+
+        const li = document.createElement('li');
+        li.className = 'member-list-item';
+
+        const left = document.createElement('div');
+        left.className = 'member-list-left';
+        left.innerHTML = `
+            <div class="member-avatar">${username[0].toUpperCase()}</div>
+            <div>
+                <div class="member-name">${username}</div>
+                ${isCreator ? '<div class="member-role creator">Trưởng nhóm</div>' : isThisAdmin ? '<div class="member-role admin">Quản trị</div>' : ''}
+            </div>
+        `;
+
+        li.appendChild(left);
+
+        // Nút xoá (admin only, không xoá creator hoặc chính mình)
+        if (isAdmin && !isCreator && userId?.toString() !== myIdentity.userId) {
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'btn-remove-member';
+            removeBtn.textContent = 'Xoá';
+            removeBtn.addEventListener('click', () => removeMemberFromGroup(groupId, userId?.toString(), username));
+            li.appendChild(removeBtn);
+        }
+
+        memberList.appendChild(li);
+    });
+
+    // Section thêm thành viên (admin only)
+    const addSection = document.getElementById('add-member-section');
+    if (isAdmin) {
+        addSection.classList.remove('hidden');
+        const currentMemberIds = new Set(group.members?.map(m => (m.userId?._id || m.userId)?.toString()));
+
+        const checkboxes = document.getElementById('add-member-checkboxes');
+        checkboxes.innerHTML = '';
+        const availableFriends = [...document.querySelectorAll('.contact-item[data-status="accepted"]')]
+            .filter(item => !currentMemberIds.has(item.dataset.id));
+
+        if (availableFriends.length === 0) {
+            checkboxes.innerHTML = '<div style="color:#999;font-size:12px">Tất cả bạn bè đã trong nhóm.</div>';
+        } else {
+            availableFriends.forEach(item => {
+                const label = document.createElement('label');
+                label.className = 'friend-checkbox-item';
+                label.innerHTML = `
+                    <input type="checkbox" class="add-member-checkbox" data-id="${item.dataset.id}" data-name="${item.dataset.username}">
+                    <span class="friend-checkbox-avatar">${item.dataset.username[0].toUpperCase()}</span>
+                    <span>${item.dataset.username}</span>
+                `;
+                checkboxes.appendChild(label);
+            });
+        }
+    } else {
+        addSection.classList.add('hidden');
+    }
+}
+
+async function addSelectedMembers() {
+    const checked = [...document.querySelectorAll('.add-member-checkbox:checked')];
+    if (checked.length === 0) { alert('Chọn ít nhất 1 người'); return; }
+
+    const groupId  = currentGroupId;
+    const groupKey = await getGroupKey(groupId);
+    if (!groupKey) { alert('Không có group key'); return; }
+
+    const btn = document.getElementById('btn-add-member');
+    btn.disabled = true; btn.textContent = 'Đang thêm...';
+
+    const errEl = document.getElementById('manage-group-error');
+    errEl.classList.add('hidden');
+
+    try {
+        const ids    = checked.map(cb => cb.dataset.id);
+        const keysRes = await authFetch(`/api/groups/member-keys?userIds=${ids.join(',')}`);
+        if (!keysRes) throw new Error('Không lấy được public keys');
+        const members = await keysRes.json();
+
+        for (const m of members) {
+            const { encryptedGroupKey, keyIv } = await encryptGroupKeyForMember(groupKey, m.publicKey);
+            const res = await authFetch(`/api/groups/${groupId}/add-member`, {
+                method: 'POST',
+                body: JSON.stringify({ userId: m._id, encryptedGroupKey, keyIv })
+            });
+            if (!res) continue;
+            const data = await res.json();
+            if (data.success) {
+                socket.emit('broadcast_group_member_added', {
+                    groupId,
+                    newMember: data.newMember,
+                    groupName: document.getElementById('manage-group-title').textContent.replace('⚙️ ', '')
+                });
+            }
+        }
+
+        await loadManageModal(groupId);
+    } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('hidden');
+    } finally {
+        btn.disabled = false; btn.textContent = '＋ Thêm thành viên đã chọn';
+    }
+}
+
+async function removeMemberFromGroup(groupId, userId, username) {
+    if (!confirm(`Xoá ${username} khỏi nhóm?`)) return;
+    const errEl = document.getElementById('manage-group-error');
+    errEl.classList.add('hidden');
+
+    const res  = await authFetch(`/api/groups/${groupId}/remove-member`, {
+        method: 'POST',
+        body: JSON.stringify({ userId })
+    });
+    if (!res) return;
+    const data = await res.json();
+    if (data.success) {
+        socket.emit('broadcast_group_member_removed', { groupId, removedUserId: userId });
+        await loadManageModal(groupId);
+        appendMessage(`${username} đã bị xoá khỏi nhóm`, 'system');
+    } else {
+        errEl.textContent = data.message;
+        errEl.classList.remove('hidden');
+    }
+}
+
+// Load groups khi init xong (gọi trong initApp)
+// Được gọi tự động vì initApp() đã chạy ở trên
+loadGroups();

@@ -8,16 +8,16 @@
 </head>
 <body>
     <div class="app-container">
+
+        <!-- ══ SIDEBAR ══ -->
         <div class="sidebar">
             <div class="my-profile">
                 <h3 class="user-name">👤 <span id="my-username">...</span></h3>
-
                 <div class="profile-actions">
                     <div class="notification-container">
                         <button id="btn-requests" class="icon-btn">
                             🔔 <span id="req-count" class="badge hidden">0</span>
                         </button>
-                        
                         <div id="requests-popup" class="requests-popup hidden">
                             <h4>Lời mời kết bạn</h4>
                             <ul id="requests-list">
@@ -25,36 +25,53 @@
                             </ul>
                         </div>
                     </div>
-
-                    <button id="btn-logout" class="small-btn" title="Đăng xuất">⏻</button> 
+                    <button id="btn-logout" class="small-btn" title="Đăng xuất">⏻</button>
                 </div>
             </div>
-            
+
+            <!-- Tìm bạn -->
             <div class="search-box">
                 <input type="text" id="search-input" placeholder="Tìm username mới...">
                 <button id="btn-connect">Thêm</button>
             </div>
-            
-            <div class="contacts-area">
-                <h4>Trò chuyện gần đây</h4>
-                <ul id="contacts-list" class="contacts-list">
-                    </ul>
+
+            <!-- Tab: Bạn bè | Nhóm -->
+            <div class="sidebar-tabs">
+                <button class="tab-btn active" id="tab-friends">Bạn bè</button>
+                <button class="tab-btn"         id="tab-groups">Nhóm</button>
+            </div>
+
+            <!-- Danh sách bạn bè -->
+            <div class="contacts-area" id="panel-friends">
+                <ul id="contacts-list" class="contacts-list"></ul>
+            </div>
+
+            <!-- Danh sách nhóm -->
+            <div class="contacts-area hidden" id="panel-groups">
+                <div class="group-list-header">
+                    <span style="font-size:13px;color:#666">Nhóm của bạn</span>
+                    <button id="btn-create-group" class="btn-create-group" title="Tạo nhóm mới">＋ Tạo nhóm</button>
+                </div>
+                <ul id="groups-list" class="contacts-list"></ul>
             </div>
 
             <div id="status-bar" class="status">🔴 Offline</div>
         </div>
 
+        <!-- ══ CHAT AREA ══ -->
         <div class="chat-area">
             <div id="chat-header" class="chat-header hidden">
                 <div class="header-info">
                     <span class="partner-name" id="partner-name">...</span>
                     <span class="partner-status" id="partner-status">Offline</span>
                 </div>
+                <!-- Nút quản lý nhóm (chỉ hiện khi đang chat nhóm) -->
+                <button id="btn-manage-group" class="btn-manage-group hidden" title="Quản lý nhóm">⚙️</button>
             </div>
 
             <div id="messages-list" class="messages-list">
                 <div class="welcome-text">
-                    Hãy nhập tên người dùng khác vào cột trái và bấm "Kết nối" để bắt đầu chat bí mật.
+                    Hãy chọn một cuộc trò chuyện hoặc tạo nhóm mới để bắt đầu.
                 </div>
             </div>
 
@@ -68,11 +85,76 @@
                 <p id="block-desc">Các bạn sẽ không thể nhắn tin cho nhau trong đoạn chat này.</p>
                 <button id="btn-unblock" class="block-btn">Bỏ chặn</button>
             </div>
-        </div>       
+        </div>
     </div>
 
-    
-    
+    <!-- ══ MODAL: TẠO NHÓM ══ -->
+    <div id="modal-create-group" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Tạo nhóm mới</h3>
+                <button class="modal-close" id="btn-close-create-group">✕</button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Tên nhóm -->
+                <label class="modal-label">Tên nhóm</label>
+                <input type="text" id="group-name-input" placeholder="Nhập tên nhóm..." maxlength="50" class="modal-input">
+
+                <!-- Tìm & thêm thành viên -->
+                <label class="modal-label" style="margin-top:14px">Thêm thành viên từ bạn bè</label>
+                <div id="friend-checkboxes" class="friend-checkbox-list">
+                    <!-- Render bởi JS -->
+                </div>
+
+                <!-- Thành viên đã chọn -->
+                <div id="selected-members-preview" class="selected-members-preview hidden">
+                    <span class="modal-label">Đã chọn:</span>
+                    <div id="selected-chips" class="selected-chips"></div>
+                </div>
+
+                <div id="create-group-error" class="modal-error hidden"></div>
+            </div>
+
+            <div class="modal-footer">
+                <button id="btn-cancel-create-group" class="btn-modal-cancel">Huỷ</button>
+                <button id="btn-submit-create-group" class="btn-modal-primary">Tạo nhóm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ MODAL: QUẢN LÝ NHÓM ══ -->
+    <div id="modal-manage-group" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="manage-group-title">Quản lý nhóm</h3>
+                <button class="modal-close" id="btn-close-manage-group">✕</button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Danh sách thành viên -->
+                <label class="modal-label">Thành viên (<span id="member-count">0</span>)</label>
+                <ul id="member-list" class="member-list"></ul>
+
+                <!-- Thêm thành viên (admin only) -->
+                <div id="add-member-section" class="hidden">
+                    <label class="modal-label" style="margin-top:14px">Thêm thành viên</label>
+                    <div id="add-member-checkboxes" class="friend-checkbox-list"></div>
+                    <button id="btn-add-member" class="btn-modal-primary" style="margin-top:10px;width:100%">
+                        ＋ Thêm thành viên đã chọn
+                    </button>
+                </div>
+
+                <div id="manage-group-error" class="modal-error hidden"></div>
+            </div>
+
+            <div class="modal-footer">
+                <button id="btn-leave-group" class="btn-modal-danger">Rời nhóm</button>
+                <button id="btn-close-manage-group-2" class="btn-modal-cancel">Đóng</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script type="module" src="js/app.js"></script>
 </body>
