@@ -455,7 +455,12 @@ io.on('connection', (socket) => {
                 fromUser: socket.username,
                 fromId: socket.userId
             });
-            socket.emit('request_sent_success', `Đã gửi lời mời tới ${targetUsername}`);
+
+            const notifContent = `Đã gửi lời mời tới ${targetUsername}`;
+            await User.findByIdAndUpdate(socket.userId, {
+                $push: { notifications: { content: notifContent, type: 'friend_request_sent' } }
+            });
+            socket.emit('request_sent_success', notifContent);
 
         } catch (err) {
             logger.error({ event: 'socket_error', handler: 'send_friend_request', error: err.message });

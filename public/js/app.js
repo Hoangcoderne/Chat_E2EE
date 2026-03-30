@@ -473,7 +473,11 @@ socket.on('reaction_updated', ({ messageId, reactions }) => {
 
 // [FIX #1] Thêm handler cho request_sent_success
 socket.on('request_sent_success', (msg) => {
-    appendMessage(msg, 'system');
+    notifications.unshift({
+        _id: 'temp_' + Date.now(),
+        content: msg
+    });
+    updateRequestUI();
 });
 
 socket.on('error', (msg) => alert(msg));
