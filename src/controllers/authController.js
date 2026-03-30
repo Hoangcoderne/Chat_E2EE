@@ -59,8 +59,25 @@ exports.register = async (req, res) => {
         res.status(201).json({ message: 'Đăng ký thành công!' });
 
     } catch (error) {
-        logger.error({ event: 'register_error', error: error.message });
-        res.status(500).json({ message: 'Lỗi server khi đăng ký' });
+        // Log stack đầy đủ để debug
+        logger.error({ event: 'register_error', error: error.message, stack: error.stack });
+
+        // Mongoose ValidationError (required field thiếu hoặc sai format)
+        if (error.name === 'ValidationError') {
+            const fields = Object.keys(error.errors).join(', ');
+            return res.status(400).json({ message: `Dữ liệu không hợp lệ: ${fields}` });
+        }
+
+        // MongoDB duplicate key (username đã tồn tại — race condition)
+        if (error.code === 11000) {
+            return res.status(400).json({ message: 'Username đã tồn tại' });
+        }
+
+        // Trong development → trả về lỗi thật để debug dễ hơn
+        const isDev = process.env.NODE_ENV !== 'production';
+        res.status(500).json({
+            message: isDev ? `Lỗi server: ${error.message}` : 'Lỗi server khi đăng ký'
+        });
     }
 };
 

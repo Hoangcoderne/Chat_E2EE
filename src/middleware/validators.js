@@ -24,8 +24,9 @@ const validateUsername = body('username')
     .isLength({ min: 3, max: 20 })
     .withMessage('Tên đăng nhập phải từ 3–20 ký tự')
     .matches(/^[a-zA-Z0-9_-]+$/)
-    .withMessage('Tên đăng nhập chỉ được chứa chữ cái, số, _ hoặc -')
-    .escape();
+    .withMessage('Tên đăng nhập chỉ được chứa chữ cái, số, _ hoặc -');
+    // KHÔNG dùng .escape() — nó thay đổi giá trị username (HTML encode)
+    // Regex đã đủ để chặn injection
 
 // Password: tối thiểu 6 ký tự (giữ nguyên yêu cầu của dự án, không tăng lên để không breaking)
 const validatePassword = body('password')
