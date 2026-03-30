@@ -25,10 +25,10 @@ let currentChat = {
     sharedSecret: null
 };
 
-// [MỚI] Theo dõi số tin chưa đọc theo từng contactId
+// Theo dõi số tin chưa đọc theo từng contactId
 let unreadCounts = {};
 
-// [MỚI] Tin nhắn đang chờ forward sau khi handshake xong
+// Tin nhắn đang chờ forward sau khi handshake xong
 let pendingForward = null;
 
 // ── Group chat state ──
@@ -117,7 +117,7 @@ async function authFetch(url, options = {}, _isRetry = false) {
     return res;
 }
 
-// [FIX #5] Refresh token nằm trong HttpOnly Cookie — browser tự gửi kèm
+// Refresh token nằm trong HttpOnly Cookie — browser tự gửi kèm
 // Không cần đọc/gửi refreshToken từ localStorage nữa
 async function tryRefreshToken() {
     try {
@@ -139,7 +139,7 @@ async function tryRefreshToken() {
     }
 }
 
-// [MỚI] Format timestamp hiển thị trên tin nhắn
+// Format timestamp hiển thị trên tin nhắn
 function formatTime(date) {
     const d = new Date(date);
     const now = new Date();
@@ -155,7 +155,7 @@ function formatTime(date) {
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + timeStr;
 }
 
-// [MỚI] Cập nhật badge số tin chưa đọc trên sidebar
+// Cập nhật badge số tin chưa đọc trên sidebar
 function setUnreadBadge(userId, count) {
     unreadCounts[userId] = count;
     const badge = document.getElementById(`unread-${userId}`);
@@ -193,7 +193,7 @@ function loadKeyFromDB(id = 'my-private-key') {
 
 async function logout() {
     try {
-        // [FIX #5] Không cần gửi refreshToken trong body
+        // Không cần gửi refreshToken trong body
         // Server đọc từ HttpOnly cookie và tự xóa cookie đó
         fetch('/api/auth/logout', {
             method: 'POST',
@@ -211,7 +211,7 @@ async function logout() {
 
         sessionStorage.clear();
         localStorage.removeItem('accessToken');
-        // [FIX #5] Không còn refreshToken trong localStorage để xóa
+        // Không còn refreshToken trong localStorage để xóa
         window.location.href = '/login.html';
     }
 }
@@ -299,7 +299,7 @@ socket.on('response_public_key', async (data) => {
 
         await loadChatHistory();
 
-        // [MỚI] Reset badge ngay khi mở chat
+        // Reset badge ngay khi mở chat
         resetUnreadBadge(userId);
 
         // Nếu có tin đang chờ forward → gửi ngay sau khi handshake
@@ -322,7 +322,7 @@ socket.on('response_public_key', async (data) => {
 
 // B. Nhận tin nhắn
 socket.on('receive_message', async (payload) => {
-    // [MỚI] Cập nhật preview sidebar dù chat có đang mở hay không
+    // Cập nhật preview sidebar dù chat có đang mở hay không
     updateContactPreview(payload.senderId);
 
     // Nếu đang chat với người này → hiện tin + mark read ngay
@@ -346,12 +346,12 @@ socket.on('receive_message', async (payload) => {
             appendMessage("⚠️ [Lỗi giải mã]", 'received', false);
         }
     } else {
-        // [MỚI] Chat khác đang mở → tăng badge
+        // Chat khác đang mở → tăng badge
         incrementUnreadBadge(payload.senderId);
     }
 });
 
-// [MỚI] B2. Đồng bộ tin nhắn đã gửi sang thiết bị khác (cùng tài khoản)
+// B2. Đồng bộ tin nhắn đã gửi sang thiết bị khác (cùng tài khoản)
 socket.on('message_sent_sync', async (payload) => {
     const { senderSocketId, messageId, recipientId, encryptedContent, iv, signature, timestamp } = payload;
 
@@ -452,18 +452,18 @@ socket.on('you_have_been_unblocked', ({ unblockerId }) => {
     }
 });
 
-// [FIX #1] Handler system_message
+// Handler system_message
 socket.on('system_message', ({ text }) => {
     appendMessage(text, 'system');
 });
 
-// [MỚI] Tin nhắn bị xoá
+// Tin nhắn bị xoá
 socket.on('message_deleted', ({ messageId }) => {
     const el = document.querySelector(`.msg-wrapper[data-msg-id="${messageId}"]`);
     if (el) el.remove();
 });
 
-// [MỚI] Reaction được cập nhật
+// Reaction được cập nhật
 socket.on('reaction_updated', ({ messageId, reactions }) => {
     const wrapper = document.querySelector(`.msg-wrapper[data-msg-id="${messageId}"]`);
     if (!wrapper) return;
@@ -471,7 +471,7 @@ socket.on('reaction_updated', ({ messageId, reactions }) => {
     if (bar) renderReactions(bar, reactions);
 });
 
-// [FIX #1] Thêm handler cho request_sent_success
+// Thêm handler cho request_sent_success
 socket.on('request_sent_success', (msg) => {
     appendMessage(msg, 'system');
 });
@@ -547,7 +547,7 @@ async function loadChatHistory() {
         }
         dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
 
-        // [MỚI] Đánh dấu đã đọc + reset badge sau khi load history
+        // Đánh dấu đã đọc + reset badge sau khi load history
         socket.emit('mark_read', { partnerId });
         resetUnreadBadge(partnerId);
     } catch (err) {
@@ -582,7 +582,7 @@ async function loadNotifications() {
 // 6. UI RENDERING & INTERACTIONS
 // ============================================================
 
-// [FIX #3] Vẽ contact item dùng đúng class CSS đã định nghĩa trong main.css
+// Vẽ contact item dùng đúng class CSS đã định nghĩa trong main.css
 function renderContactItem(user) {
     if (document.querySelector(`.contact-item[data-id="${user._id}"]`)) return;
 
@@ -600,7 +600,7 @@ function renderContactItem(user) {
     menu.id = `menu-${user._id}`;
     menu.className = 'options-menu hidden';
 
-    // [FIX CSP] Không dùng onclick="..." inline — vi phạm Content Security Policy
+    // Không dùng onclick="..." inline — vi phạm Content Security Policy
     // Dùng createElement + addEventListener thay thế
     const btnBlock   = document.createElement('button');
     btnBlock.className = 'danger';
@@ -631,7 +631,7 @@ function renderContactItem(user) {
         <div class="last-message" id="preview-${user._id}">Nhấn để chat</div>
     `;
 
-    // [MỚI] Badge số tin chưa đọc
+    // Badge số tin chưa đọc
     const badge = document.createElement('span');
     badge.className = 'unread-badge hidden';
     badge.id = `unread-${user._id}`;
@@ -641,7 +641,7 @@ function renderContactItem(user) {
         unreadCounts[user._id] = user.unreadCount;
     }
 
-    // [FIX CSP] Nút ⋮ dùng addEventListener thay vì onclick="..."
+    // Nút ⋮ dùng addEventListener thay vì onclick="..."
     const optionsBtn = document.createElement('button');
     optionsBtn.className = 'contact-options-btn';
     optionsBtn.textContent = '⋮';
@@ -1108,7 +1108,7 @@ async function doForwardMessage(text, targetId, targetUsername) {
     startHandshake(targetUsername);
 }
 
-// [MỚI] Cập nhật dòng preview "Tin nhắn mới" ở sidebar
+// Cập nhật dòng preview "Tin nhắn mới" ở sidebar
 function updateContactPreview(userId) {
     const el = document.getElementById(`preview-${userId}`);
     if (el) el.textContent = 'Có tin nhắn mới';
@@ -1151,7 +1151,7 @@ async function sendMessage() {
             signature
         });
 
-        // [MỚI] isTemp=true: hiện ngay, chờ message_sent_sync gán msgId thật
+        // isTemp=true: hiện ngay, chờ message_sent_sync gán msgId thật
         appendMessage(text, 'sent', null, new Date(), null, true);
         dom.msgInput.value = '';
     } catch (err) {

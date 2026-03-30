@@ -2,7 +2,7 @@
 require('dotenv').config();
 
 // ══════════════════════════════════════════════════
-// [MỚI] Kiểm tra biến môi trường bắt buộc ngay khi khởi động
+// Kiểm tra biến môi trường bắt buộc ngay khi khởi động
 // Nếu thiếu → dừng hẳn, không để server chạy với config sai
 // ══════════════════════════════════════════════════
 const REQUIRED_ENV = ['MONGO_URI', 'SESSION_SECRET', 'FRONTEND_URL'];
@@ -17,28 +17,28 @@ REQUIRED_ENV.forEach(key => {
 const express = require('express');
 const http = require('http');
 const path = require('path');
-const helmet = require('helmet');           // [MỚI] Security headers
+const helmet = require('helmet');           // Security headers
 const cookieParser = require('cookie-parser');
 const connectDB = require('./config/db');
 const { Server } = require('socket.io');
-const logger = require('./utils/logger');  // [MỚI] Structured logging
-const requestLogger = require('./middleware/requestLogger'); // [MỚI]
-const { apiLimiter, authLimiter, registerLimiter, resetLimiter } = require('./middleware/rateLimiter'); // [MỚI]
+const logger = require('./utils/logger');  // Structured logging
+const requestLogger = require('./middleware/requestLogger'); 
+const { apiLimiter, authLimiter, registerLimiter, resetLimiter } = require('./middleware/rateLimiter'); 
 
 const Message = require('./models/Message');
 const User = require('./models/User');
 const Friendship = require('./models/Friendship');
 const authRoutes  = require('./routes/authRoutes');
 const chatRoutes  = require('./routes/chatRoutes');
-const groupRoutes = require('./routes/groupRoutes');  // [MỚI]
-const GroupMessage = require('./models/GroupMessage'); // [MỚI]
-const Group        = require('./models/Group');        // [MỚI]
+const groupRoutes = require('./routes/groupRoutes');  
+const GroupMessage = require('./models/GroupMessage'); 
+const Group        = require('./models/Group');        
 
 const app = express();
 const server = http.createServer(app);
 
 // ══════════════════════════════════════════════════
-// [MỚI] Trust proxy — bắt buộc khi deploy sau Nginx/Heroku/Render
+// Trust proxy — bắt buộc khi deploy sau Nginx/Heroku/Render
 // Không có dòng này → rate limit dùng IP sai
 // ══════════════════════════════════════════════════
 app.set('trust proxy', 1);
@@ -59,7 +59,7 @@ connectDB();
 // MIDDLEWARES
 // ══════════════════════════════════════════════════
 
-// [MỚI] Helmet: tự động thêm các HTTP security headers
+//  Helmet: tự động thêm các HTTP security headers
 // Bảo vệ khỏi Clickjacking, XSS, MIME sniffing, v.v.
 // Cấu hình CSP cho phép:
 //   - socket.io script từ cùng origin
@@ -93,14 +93,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// [MỚI] Log tất cả HTTP requests
+//  Log tất cả HTTP requests
 app.use(requestLogger);
 
 // Static files (public/)
 app.use(express.static(path.join(__dirname, '../public')));
 
 // ══════════════════════════════════════════════════
-// [MỚI] RATE LIMITING
+//  RATE LIMITING
 // Thứ tự quan trọng: specific limiters phải đặt TRƯỚC apiLimiter
 // ══════════════════════════════════════════════════
 app.use('/api/auth/login', authLimiter);
@@ -114,10 +114,10 @@ app.use('/api/', apiLimiter); // Giới hạn chung cho toàn bộ API
 // ══════════════════════════════════════════════════
 app.use('/api/auth',   authRoutes);
 app.use('/api/chat',   chatRoutes);
-app.use('/api/groups', groupRoutes); // [MỚI]
+app.use('/api/groups', groupRoutes); // 
 
 // ══════════════════════════════════════════════════
-// [MỚI] GLOBAL ERROR HANDLER
+//  GLOBAL ERROR HANDLER
 // Bắt tất cả lỗi không được xử lý trong các route/middleware
 // ══════════════════════════════════════════════════
 app.use((err, req, res, next) => {
@@ -133,7 +133,7 @@ app.use((err, req, res, next) => {
 });
 
 // ══════════════════════════════════════════════════
-// [MỚI] Xử lý Promise bị reject không được catch
+//  Xử lý Promise bị reject không được catch
 // Ngăn server crash thầm lặng
 // ══════════════════════════════════════════════════
 process.on('unhandledRejection', (reason) => {
@@ -231,7 +231,7 @@ io.on('connection', (socket) => {
                 timestamp: newMessage.timestamp
             });
 
-            // [MỚI] Đồng bộ tới TẤT CẢ thiết bị của sender (multi-device)
+            //  Đồng bộ tới TẤT CẢ thiết bị của sender (multi-device)
             // Kèm senderSocketId để thiết bị gửi bỏ qua (đã hiển thị local)
             io.to(senderId).emit('message_sent_sync', {
                 messageId: newMessage._id.toString(),
@@ -247,7 +247,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // [MỚI] 3b. Đánh dấu đã đọc — client gọi khi mở chat với một người
+    //  3b. Đánh dấu đã đọc — client gọi khi mở chat với một người
     socket.on('mark_read', async ({ partnerId }) => {
         try {
             if (!socket.userId) return;
@@ -271,7 +271,7 @@ io.on('connection', (socket) => {
     });
 
 
-    // [MỚI] 3c. Broadcast xoá tin nhắn real-time
+    //  3c. Broadcast xoá tin nhắn real-time
     // HTTP handler (chatController.deleteMessage) đã xoá DB và trả về recipientId
     // Client gọi socket này SAU KHI HTTP delete thành công để broadcast UI update
     socket.on('broadcast_delete_message', ({ messageId, recipientId }) => {
@@ -282,7 +282,7 @@ io.on('connection', (socket) => {
         io.to(socket.userId).emit('message_deleted', { messageId });
     });
 
-    // [MỚI] 3d. Broadcast reaction real-time
+    //  3d. Broadcast reaction real-time
     // HTTP handler (chatController.toggleReaction) đã cập nhật DB
     // Client gọi socket này SAU KHI HTTP thành công để broadcast
     socket.on('broadcast_reaction', ({ messageId, reactions, partnerId }) => {
@@ -293,13 +293,13 @@ io.on('connection', (socket) => {
         io.to(socket.userId).emit('reaction_updated', { messageId, reactions });
     });
 
-    // [MỚI] 3e. Join tất cả group rooms của user khi kết nối
+    //  3e. Join tất cả group rooms của user khi kết nối
     socket.on('join_groups', async (groupIds) => {
         if (!Array.isArray(groupIds)) return;
         groupIds.forEach(gid => socket.join('group:' + gid));
     });
 
-    // [MỚI] 3f. Gửi tin nhắn nhóm E2EE
+    //  3f. Gửi tin nhắn nhóm E2EE
     socket.on('send_group_message', async ({ groupId, encryptedContent, iv, signature }) => {
         try {
             if (!socket.userId)
@@ -343,7 +343,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // [MỚI] 3g. Thông báo khi admin thêm/xoá thành viên (broadcast real-time)
+    //  3g. Thông báo khi admin thêm/xoá thành viên (broadcast real-time)
     socket.on('broadcast_group_member_added', ({ groupId, newMember, groupName }) => {
         if (!socket.userId) return;
         // Thông báo toàn nhóm cũ
