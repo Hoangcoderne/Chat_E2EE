@@ -850,3 +850,62 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     transition: background .12s;
 }
 .btn-remove-member:hover { background: #fff0f0; }
+
+/* ════════════════════════════════════════════════════
+   [FIX BUG 1] GROUP SEEN INDICATOR
+   ════════════════════════════════════════════════════ */
+
+.group-seen-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 4px 4px;
+    flex-wrap: wrap;
+}
+.group-seen-bar::before {
+    content: '👁 Đã xem:';
+    font-size: 10.5px;
+    color: #aaa;
+    margin-right: 2px;
+}
+.group-seen-item {
+    font-size: 10.5px;
+    color: #888;
+    background: #f0f0f0;
+    border-radius: 99px;
+    padding: 1px 7px;
+    font-weight: 500;
+}
+.group-seen-more {
+    color: #aaa;
+    background: none;
+}
+
+/* ════════════════════════════════════════════════════
+   [FIX BUG 2] GROUP INVITE TOAST
+   ════════════════════════════════════════════════════ */
+
+.group-invite-toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a2e;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.3);
+    z-index: 99999;
+    cursor: pointer;
+    animation: toastIn .3s ease;
+    max-width: 360px;
+    text-align: center;
+}
+.group-invite-toast:hover {
+    background: #2d2d44;
+}
+@keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}

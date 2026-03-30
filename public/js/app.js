@@ -25,10 +25,10 @@ let currentChat = {
     sharedSecret: null
 };
 
-// Theo dõi số tin chưa đọc theo từng contactId
+// [MỚI] Theo dõi số tin chưa đọc theo từng contactId
 let unreadCounts = {};
 
-// Tin nhắn đang chờ forward sau khi handshake xong
+// [MỚI] Tin nhắn đang chờ forward sau khi handshake xong
 let pendingForward = null;
 
 // ── Group chat state ──
@@ -117,7 +117,7 @@ async function authFetch(url, options = {}, _isRetry = false) {
     return res;
 }
 
-// Refresh token nằm trong HttpOnly Cookie — browser tự gửi kèm
+// [FIX #5] Refresh token nằm trong HttpOnly Cookie — browser tự gửi kèm
 // Không cần đọc/gửi refreshToken từ localStorage nữa
 async function tryRefreshToken() {
     try {
@@ -139,7 +139,7 @@ async function tryRefreshToken() {
     }
 }
 
-// Format timestamp hiển thị trên tin nhắn
+// [MỚI] Format timestamp hiển thị trên tin nhắn
 function formatTime(date) {
     const d = new Date(date);
     const now = new Date();
@@ -155,7 +155,7 @@ function formatTime(date) {
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + timeStr;
 }
 
-// Cập nhật badge số tin chưa đọc trên sidebar
+// [MỚI] Cập nhật badge số tin chưa đọc trên sidebar
 function setUnreadBadge(userId, count) {
     unreadCounts[userId] = count;
     const badge = document.getElementById(`unread-${userId}`);
@@ -193,7 +193,7 @@ function loadKeyFromDB(id = 'my-private-key') {
 
 async function logout() {
     try {
-        // Không cần gửi refreshToken trong body
+        // [FIX #5] Không cần gửi refreshToken trong body
         // Server đọc từ HttpOnly cookie và tự xóa cookie đó
         fetch('/api/auth/logout', {
             method: 'POST',
@@ -211,7 +211,7 @@ async function logout() {
 
         sessionStorage.clear();
         localStorage.removeItem('accessToken');
-        // Không còn refreshToken trong localStorage để xóa
+        // [FIX #5] Không còn refreshToken trong localStorage để xóa
         window.location.href = '/login.html';
     }
 }
@@ -299,7 +299,7 @@ socket.on('response_public_key', async (data) => {
 
         await loadChatHistory();
 
-        // Reset badge ngay khi mở chat
+        // [MỚI] Reset badge ngay khi mở chat
         resetUnreadBadge(userId);
 
         // Nếu có tin đang chờ forward → gửi ngay sau khi handshake
@@ -322,7 +322,7 @@ socket.on('response_public_key', async (data) => {
 
 // B. Nhận tin nhắn
 socket.on('receive_message', async (payload) => {
-    // Cập nhật preview sidebar dù chat có đang mở hay không
+    // [MỚI] Cập nhật preview sidebar dù chat có đang mở hay không
     updateContactPreview(payload.senderId);
 
     // Nếu đang chat với người này → hiện tin + mark read ngay
@@ -346,12 +346,12 @@ socket.on('receive_message', async (payload) => {
             appendMessage("⚠️ [Lỗi giải mã]", 'received', false);
         }
     } else {
-        // Chat khác đang mở → tăng badge
+        // [MỚI] Chat khác đang mở → tăng badge
         incrementUnreadBadge(payload.senderId);
     }
 });
 
-// B2. Đồng bộ tin nhắn đã gửi sang thiết bị khác (cùng tài khoản)
+// [MỚI] B2. Đồng bộ tin nhắn đã gửi sang thiết bị khác (cùng tài khoản)
 socket.on('message_sent_sync', async (payload) => {
     const { senderSocketId, messageId, recipientId, encryptedContent, iv, signature, timestamp } = payload;
 
@@ -452,18 +452,18 @@ socket.on('you_have_been_unblocked', ({ unblockerId }) => {
     }
 });
 
-// Handler system_message
+// [FIX #1] Handler system_message
 socket.on('system_message', ({ text }) => {
     appendMessage(text, 'system');
 });
 
-// Tin nhắn bị xoá
+// [MỚI] Tin nhắn bị xoá
 socket.on('message_deleted', ({ messageId }) => {
     const el = document.querySelector(`.msg-wrapper[data-msg-id="${messageId}"]`);
     if (el) el.remove();
 });
 
-// Reaction được cập nhật
+// [MỚI] Reaction được cập nhật
 socket.on('reaction_updated', ({ messageId, reactions }) => {
     const wrapper = document.querySelector(`.msg-wrapper[data-msg-id="${messageId}"]`);
     if (!wrapper) return;
@@ -471,7 +471,7 @@ socket.on('reaction_updated', ({ messageId, reactions }) => {
     if (bar) renderReactions(bar, reactions);
 });
 
-// Thêm handler cho request_sent_success
+// [FIX #1] Thêm handler cho request_sent_success
 socket.on('request_sent_success', (msg) => {
     appendMessage(msg, 'system');
 });
@@ -547,7 +547,7 @@ async function loadChatHistory() {
         }
         dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
 
-        // Đánh dấu đã đọc + reset badge sau khi load history
+        // [MỚI] Đánh dấu đã đọc + reset badge sau khi load history
         socket.emit('mark_read', { partnerId });
         resetUnreadBadge(partnerId);
     } catch (err) {
@@ -582,7 +582,7 @@ async function loadNotifications() {
 // 6. UI RENDERING & INTERACTIONS
 // ============================================================
 
-// Vẽ contact item dùng đúng class CSS đã định nghĩa trong main.css
+// [FIX #3] Vẽ contact item dùng đúng class CSS đã định nghĩa trong main.css
 function renderContactItem(user) {
     if (document.querySelector(`.contact-item[data-id="${user._id}"]`)) return;
 
@@ -600,7 +600,7 @@ function renderContactItem(user) {
     menu.id = `menu-${user._id}`;
     menu.className = 'options-menu hidden';
 
-    // Không dùng onclick="..." inline — vi phạm Content Security Policy
+    // [FIX CSP] Không dùng onclick="..." inline — vi phạm Content Security Policy
     // Dùng createElement + addEventListener thay thế
     const btnBlock   = document.createElement('button');
     btnBlock.className = 'danger';
@@ -631,7 +631,7 @@ function renderContactItem(user) {
         <div class="last-message" id="preview-${user._id}">Nhấn để chat</div>
     `;
 
-    // Badge số tin chưa đọc
+    // [MỚI] Badge số tin chưa đọc
     const badge = document.createElement('span');
     badge.className = 'unread-badge hidden';
     badge.id = `unread-${user._id}`;
@@ -641,7 +641,7 @@ function renderContactItem(user) {
         unreadCounts[user._id] = user.unreadCount;
     }
 
-    // Nút ⋮ dùng addEventListener thay vì onclick="..."
+    // [FIX CSP] Nút ⋮ dùng addEventListener thay vì onclick="..."
     const optionsBtn = document.createElement('button');
     optionsBtn.className = 'contact-options-btn';
     optionsBtn.textContent = '⋮';
@@ -1108,7 +1108,7 @@ async function doForwardMessage(text, targetId, targetUsername) {
     startHandshake(targetUsername);
 }
 
-// Cập nhật dòng preview "Tin nhắn mới" ở sidebar
+// [MỚI] Cập nhật dòng preview "Tin nhắn mới" ở sidebar
 function updateContactPreview(userId) {
     const el = document.getElementById(`preview-${userId}`);
     if (el) el.textContent = 'Có tin nhắn mới';
@@ -1151,7 +1151,7 @@ async function sendMessage() {
             signature
         });
 
-        // isTemp=true: hiện ngay, chờ message_sent_sync gán msgId thật
+        // [MỚI] isTemp=true: hiện ngay, chờ message_sent_sync gán msgId thật
         appendMessage(text, 'sent', null, new Date(), null, true);
         dom.msgInput.value = '';
     } catch (err) {
@@ -1492,6 +1492,10 @@ async function loadGroupHistory(groupId) {
             }
         }
         dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
+
+        // [FIX BUG 1] Emit mark_group_read sau khi load và hiển thị xong
+        socket.emit('mark_group_read', { groupId });
+
     } catch (err) {
         console.error('loadGroupHistory error:', err);
     }
@@ -1554,6 +1558,8 @@ socket.on('receive_group_message', async (payload) => {
             senderLabel.textContent = senderName;
             wrapper.insertBefore(senderLabel, wrapper.firstChild);
         }
+        // [FIX BUG 1] Đang xem nhóm → đánh dấu đã đọc real-time
+        socket.emit('mark_group_read', { groupId });
     } catch (e) {
         appendMessage('[Lỗi giải mã]', 'system');
     }
@@ -1574,13 +1580,95 @@ socket.on('group_message_sent_sync', async (payload) => {
     }
 });
 
-socket.on('group_invited', async ({ groupId, groupName }) => {
+socket.on('group_invited', async ({ groupId, groupName, memberCount }) => {
+    // [FIX BUG 2] Join socket room ngay
     socket.emit('join_groups', [groupId]);
-    // Thêm nhóm vào sidebar
-    const res = await authFetch(`/api/groups/${groupId}/info`);
-    if (res) { const g = await res.json(); if (g._id) renderGroupItem(g); }
-    appendMessage(`Bạn đã được thêm vào nhóm "${groupName}"`, 'system');
+
+    // Fetch đầy đủ thông tin từ /api/groups (getGroups) để có myEncryptedKey + unreadCount
+    const res = await authFetch('/api/groups');
+    if (res) {
+        const groups = await res.json();
+        const newGroup = groups.find(g => g._id?.toString() === groupId?.toString());
+        if (newGroup) {
+            // Cập nhật cached group IDs
+            const cached = JSON.parse(sessionStorage.getItem('myGroupIds') || '[]');
+            if (!cached.includes(groupId)) {
+                cached.push(groupId);
+                sessionStorage.setItem('myGroupIds', JSON.stringify(cached));
+            }
+
+            // Render item vào sidebar (nếu chưa có)
+            const existing = document.querySelector(`.group-item[data-group-id="${groupId}"]`);
+            if (!existing) {
+                renderGroupItem(newGroup);
+            }
+
+            // [FIX BUG 2] Switch sang tab nhóm để user thấy ngay
+            dom.tabGroups?.click();
+
+            // Hiện thông báo nhỏ ở chat area
+            if (currentGroupId !== groupId) {
+                // Nếu đang mở group khác hoặc DM → hiện toast-like system msg
+                const toast = document.createElement('div');
+                toast.className   = 'group-invite-toast';
+                toast.textContent = `🎉 Bạn đã được thêm vào nhóm "${groupName}"`;
+                toast.addEventListener('click', () => {
+                    toast.remove();
+                    openGroupChat(newGroup);
+                });
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 5000);
+            }
+        }
+    }
 });
+
+// [FIX BUG 1] Nhận thông báo ai đó đã đọc tin nhắn nhóm
+socket.on('group_read_update', ({ groupId, userId, username }) => {
+    if (currentGroupId !== groupId) return;
+    // Cập nhật seen indicator ở cuối danh sách tin nhắn
+    renderGroupSeenIndicator(username);
+});
+
+// ── Hiện dòng "Đã xem: username" dưới tin nhắn cuối trong group ──
+function renderGroupSeenIndicator(username) {
+    // Xóa indicator cũ của user này nếu có
+    document.querySelectorAll(`.group-seen-item[data-user="${username}"]`)
+        .forEach(el => el.remove());
+
+    // Lấy wrapper của tin nhắn cuối cùng trong danh sách
+    const wrappers = dom.messagesList.querySelectorAll('.msg-wrapper');
+    if (wrappers.length === 0) return;
+    const lastWrapper = wrappers[wrappers.length - 1];
+
+    // Tìm hoặc tạo seen-bar bên dưới wrapper cuối
+    let seenBar = dom.messagesList.querySelector('.group-seen-bar');
+    if (!seenBar) {
+        seenBar = document.createElement('div');
+        seenBar.className = 'group-seen-bar';
+        dom.messagesList.appendChild(seenBar);
+    }
+    // Di chuyển seenBar xuống sau wrapper cuối
+    dom.messagesList.insertBefore(seenBar, lastWrapper.nextSibling);
+
+    const item = document.createElement('span');
+    item.className   = 'group-seen-item';
+    item.dataset.user = username;
+    item.textContent  = username;
+    seenBar.appendChild(item);
+
+    // Giới hạn hiện tối đa 3 người, còn lại hiện "+N"
+    const items = seenBar.querySelectorAll('.group-seen-item:not(.group-seen-more)');
+    if (items.length > 3) {
+        const more = seenBar.querySelector('.group-seen-more') || document.createElement('span');
+        more.className   = 'group-seen-item group-seen-more';
+        more.textContent  = `+${items.length - 3}`;
+        seenBar.appendChild(more);
+        items.forEach((el, i) => { el.style.display = i < 3 ? '' : 'none'; });
+    }
+
+    dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
+}
 
 socket.on('group_kicked', ({ groupId }) => {
     socket.leave?.('group:' + groupId);
@@ -1593,9 +1681,15 @@ socket.on('group_kicked', ({ groupId }) => {
     }
 });
 
-socket.on('group_member_added', ({ groupId, newMember }) => {
+socket.on('group_member_added', ({ groupId, memberCount }) => {
+    // [FIX BUG 2] Cập nhật preview sidebar member count
+    const previewEl = document.getElementById(`group-preview-${groupId}`);
+    if (previewEl && memberCount) previewEl.textContent = `${memberCount} thành viên`;
+
     if (currentGroupId === groupId) {
-        appendMessage(`${newMember.username} đã tham gia nhóm`, 'system');
+        appendMessage('Có thành viên mới tham gia nhóm', 'system');
+        // Cập nhật header status
+        if (memberCount) dom.partnerStatus.innerText = `${memberCount} thành viên`;
         // Reload manage modal nếu đang mở
         if (!dom.modalManageGroup.classList.contains('hidden')) loadManageModal(groupId);
     }
@@ -1927,6 +2021,9 @@ async function addSelectedMembers() {
         if (!keysRes) throw new Error('Không lấy được public keys');
         const members = await keysRes.json();
 
+        const addedIds = [];
+        const groupName = document.getElementById('manage-group-title').textContent.replace('⚙️ ', '');
+
         for (const m of members) {
             const { encryptedGroupKey, keyIv } = await encryptGroupKeyForMember(groupKey, m.publicKey);
             const res = await authFetch(`/api/groups/${groupId}/add-member`, {
@@ -1935,13 +2032,16 @@ async function addSelectedMembers() {
             });
             if (!res) continue;
             const data = await res.json();
-            if (data.success) {
-                socket.emit('broadcast_group_member_added', {
-                    groupId,
-                    newMember: data.newMember,
-                    groupName: document.getElementById('manage-group-title').textContent.replace('⚙️ ', '')
-                });
-            }
+            if (data.success) addedIds.push(m._id.toString());
+        }
+
+        // [FIX BUG 2] Emit 1 lần với tất cả IDs thay vì nhiều lần riêng lẻ
+        if (addedIds.length > 0) {
+            socket.emit('broadcast_group_member_added', {
+                groupId,
+                newMemberIds: addedIds,
+                groupName
+            });
         }
 
         await loadManageModal(groupId);
