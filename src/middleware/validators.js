@@ -33,20 +33,20 @@ const validatePassword = body('password')
     .isLength({ min: 6 })
     .withMessage('Mật khẩu phải ít nhất 6 ký tự');
 
-// AuthKeyHash: chuỗi Base64 do client gửi lên (không validate password trực tiếp vì E2EE)
-// Client đã hash password trước khi gửi → chỉ cần kiểm tra tồn tại và độ dài hợp lý
+// AuthKeyHash: Base64 chuẩn của PBKDF2 256-bit = 44 ký tự
+// KHÔNG dùng .isBase64() — mặc định nó chỉ chấp nhận URL-safe Base64 (-_)
+// window.btoa() tạo standard Base64 (+/=) → sẽ fail nếu hash chứa + hoặc /
 const validateAuthKeyHash = body('authKeyHash')
-    .notEmpty()
-    .withMessage('Thiếu authKeyHash')
-    .isLength({ min: 20, max: 500 })
-    .withMessage('authKeyHash không hợp lệ');
+    .notEmpty().withMessage('Thiếu authKeyHash')
+    .isString().withMessage('authKeyHash phải là chuỗi')
+    .isLength({ min: 20, max: 600 }).withMessage('authKeyHash không hợp lệ');
 
-// Salt: chuỗi Base64
+// Salt: Base64 chuẩn của 16 bytes ngẫu nhiên = 24 ký tự
+// Lý do tương tự: không dùng .isBase64()
 const validateSalt = body('salt')
-    .notEmpty()
-    .withMessage('Thiếu salt')
-    .isLength({ min: 10, max: 200 })
-    .withMessage('Salt không hợp lệ');
+    .notEmpty().withMessage('Thiếu salt')
+    .isString().withMessage('Salt phải là chuỗi')
+    .isLength({ min: 10, max: 200 }).withMessage('Salt không hợp lệ');
 
 // Recovery Key: định dạng HEX-HEX-HEX-HEX-HEX-HEX-HEX-HEX (8 nhóm 8 ký tự hex)
 const validateRecoveryKey = body('recoveryKey')
