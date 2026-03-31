@@ -179,13 +179,25 @@ function resetUnreadBadge(userId) {
 function loadKeyFromDB(id = 'my-private-key') {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open("SecureChatDB", 1);
+        // Tạo object store nếu chưa có 
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains("keys")) {
+                db.createObjectStore("keys", { keyPath: "id" });
+            }
+        };
         request.onsuccess = (event) => {
             const db = event.target.result;
-            const tx = db.transaction("keys", "readonly");
+            // Kiểm tra object store tồn tại trước khi mở transaction
+            if (!db.objectStoreNames.contains("keys")) {
+                resolve(null);
+                return;
+            }
+            const tx    = db.transaction("keys", "readonly");
             const store = tx.objectStore("keys");
             const query = store.get(id);
             query.onsuccess = () => resolve(query.result ? query.result.key : null);
-            query.onerror = () => reject("Lỗi đọc DB");
+            query.onerror  = () => reject("Lỗi đọc DB");
         };
         request.onerror = () => reject("Không mở được DB");
     });
@@ -202,8 +214,16 @@ async function logout() {
     } finally {
         try {
             const req = indexedDB.open("SecureChatDB", 1);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains("keys")) {
+                    db.createObjectStore("keys", { keyPath: "id" });
+                }
+            };
             req.onsuccess = (e) => {
-                const tx = e.target.result.transaction("keys", "readwrite");
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains("keys")) return;
+                const tx = db.transaction("keys", "readwrite");
                 tx.objectStore("keys").delete("my-private-key");
                 tx.objectStore("keys").delete("my-signing-key");
             };
