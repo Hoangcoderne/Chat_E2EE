@@ -1025,91 +1025,210 @@ function showForwardModal(wrapper) {
     const text = wrapper.dataset.plaintext;
     if (!text) return alert('Không thể chuyển tiếp tin nhắn này.');
 
+    // Set lưu các contact đã chọn: { userId, username }
+    const selectedMap = new Map();
+
     const modal = document.createElement('div');
     modal.id = '_forward_modal';
     modal.className = 'forward-modal-overlay';
 
-    const box = document.createElement('div');
-    box.className = 'forward-modal-box';
+    // ── Build modal ──
+    modal.innerHTML = `
+        <div class="forward-modal-box">
+            <div class="forward-modal-header">
+                <span class="forward-modal-title">Chuyển tiếp tin nhắn</span>
+                <button class="forward-modal-close-btn" id="_fwd_close">✕</button>
+            </div>
 
-    const title = document.createElement('h4');
-    title.textContent = 'Chuyển tiếp tin nhắn';
-    box.appendChild(title);
+            <!-- Preview nội dung tin nhắn -->
+            <div class="forward-msg-preview">
+                <span class="forward-msg-preview-label">Nội dung:</span>
+                <span class="forward-msg-preview-text">${text.length > 80 ? text.slice(0, 80) + '…' : text}</span>
+            </div>
 
-    const subtitle = document.createElement('p');
-    subtitle.className = 'forward-subtitle';
-    subtitle.textContent = 'Chọn người để gửi:';
-    box.appendChild(subtitle);
+            <!-- Chips những người đã chọn -->
+            <div class="forward-selected-bar hidden" id="_fwd_selected_bar">
+                <span class="forward-selected-label">Đã chọn:</span>
+                <div class="forward-chips" id="_fwd_chips"></div>
+            </div>
 
-    // Danh sách bạn bè từ sidebar
-    const list = document.createElement('ul');
-    list.className = 'forward-contact-list';
+            <!-- Danh sách bạn bè + nhóm -->
+            <ul class="forward-contact-list" id="_fwd_list"></ul>
 
-    const contacts = document.querySelectorAll('.contact-item[data-status="accepted"]');
-    if (contacts.length === 0) {
-        const li = document.createElement('li');
-        li.textContent = 'Không có bạn bè nào để chuyển tiếp.';
-        li.style.color = '#999';
-        li.style.fontSize = '13px';
-        list.appendChild(li);
+            <!-- Footer -->
+            <div class="forward-footer">
+                <button class="forward-cancel-btn" id="_fwd_cancel">Huỷ</button>
+                <button class="forward-send-btn" id="_fwd_send" disabled>
+                    Gửi <span id="_fwd_count"></span>
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // ── Render danh sách ──
+    const list = modal.querySelector('#_fwd_list');
+
+    // Bạn bè
+    const friends = [...document.querySelectorAll('.contact-item[data-status="accepted"]')];
+    // Nhóm
+    const groups  = [...document.querySelectorAll('.group-item')];
+
+    if (friends.length === 0 && groups.length === 0) {
+        list.innerHTML = '<li class="forward-empty">Không có ai để chuyển tiếp.</li>';
     }
 
-    contacts.forEach(item => {
-        const username = item.dataset.username;
-        const userId   = item.dataset.id;
+    const renderItem = (id, name, isGroup = false) => {
         const li = document.createElement('li');
         li.className = 'forward-contact-item';
+        li.dataset.id   = id;
+        li.dataset.name = name;
 
-        const avatar = document.createElement('span');
-        avatar.className = 'forward-avatar';
-        avatar.textContent = username[0].toUpperCase();
+        li.innerHTML = `
+            <span class="forward-item-check hidden" id="fwd-check-${id}">✓</span>
+            <span class="forward-avatar ${isGroup ? 'forward-avatar-group' : ''}">${name[0].toUpperCase()}</span>
+            <span class="forward-item-name">${name}</span>
+            ${isGroup ? '<span class="forward-item-badge">Nhóm</span>' : ''}
+        `;
 
-        const name = document.createElement('span');
-        name.textContent = username;
-
-        li.appendChild(avatar);
-        li.appendChild(name);
-        li.addEventListener('click', async () => {
-            modal.remove();
-            await doForwardMessage(text, userId, username);
+        li.addEventListener('click', () => {
+            const key = (isGroup ? 'group:' : 'dm:') + id;
+            if (selectedMap.has(key)) {
+                selectedMap.delete(key);
+                li.classList.remove('forward-item-selected');
+                modal.querySelector(`#fwd-check-${id}`)?.classList.add('hidden');
+            } else {
+                selectedMap.set(key, { id, name, isGroup });
+                li.classList.add('forward-item-selected');
+                modal.querySelector(`#fwd-check-${id}`)?.classList.remove('hidden');
+            }
+            updateForwardUI();
         });
+
         list.appendChild(li);
+    };
+
+    if (friends.length > 0) {
+        const sep = document.createElement('li');
+        sep.className = 'forward-section-label';
+        sep.textContent = 'Bạn bè';
+        list.appendChild(sep);
+        friends.forEach(item => renderItem(item.dataset.id, item.dataset.username, false));
+    }
+
+    if (groups.length > 0) {
+        const sep = document.createElement('li');
+        sep.className = 'forward-section-label';
+        sep.textContent = 'Nhóm';
+        list.appendChild(sep);
+        groups.forEach(item => {
+            const gName = item.querySelector('.contact-name')?.textContent || 'Nhóm';
+            renderItem(item.dataset.groupId, gName, true);
+        });
+    }
+
+    // ── Update UI khi chọn/bỏ chọn ──
+    function updateForwardUI() {
+        const count    = selectedMap.size;
+        const sendBtn  = modal.querySelector('#_fwd_send');
+        const countEl  = modal.querySelector('#_fwd_count');
+        const bar      = modal.querySelector('#_fwd_selected_bar');
+        const chips    = modal.querySelector('#_fwd_chips');
+
+        sendBtn.disabled = count === 0;
+        countEl.textContent = count > 0 ? `(${count})` : '';
+
+        // Render chips
+        chips.innerHTML = '';
+        selectedMap.forEach(({ name }, key) => {
+            const chip = document.createElement('span');
+            chip.className   = 'forward-chip';
+            chip.textContent = name;
+
+            // Nút x trên chip
+            const x = document.createElement('button');
+            x.className   = 'forward-chip-remove';
+            x.textContent = '×';
+            x.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectedMap.delete(key);
+                // Bỏ highlight item trong list
+                const id    = key.split(':')[1];
+                const li    = modal.querySelector(`.forward-contact-item[data-id="${id}"]`);
+                li?.classList.remove('forward-item-selected');
+                modal.querySelector(`#fwd-check-${id}`)?.classList.add('hidden');
+                updateForwardUI();
+            });
+            chip.appendChild(x);
+            chips.appendChild(chip);
+        });
+
+        bar.classList.toggle('hidden', count === 0);
+    }
+
+    // ── Nút Gửi ──
+    modal.querySelector('#_fwd_send').addEventListener('click', async () => {
+        if (selectedMap.size === 0) return;
+
+        const sendBtn = modal.querySelector('#_fwd_send');
+        sendBtn.disabled  = true;
+        sendBtn.textContent = 'Đang gửi...';
+
+        const targets = [...selectedMap.values()];
+        modal.remove();
+
+        for (const { id, name, isGroup } of targets) {
+            if (isGroup) {
+                await doForwardToGroup(text, id);
+            } else {
+                await doForwardMessage(text, id, name);
+            }
+        }
     });
 
-    box.appendChild(list);
-
-    // Nút đóng
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'forward-close-btn';
-    closeBtn.textContent = 'Huỷ';
-    closeBtn.addEventListener('click', () => modal.remove());
-    box.appendChild(closeBtn);
-
-    modal.appendChild(box);
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
-    document.body.appendChild(modal);
+    // ── Đóng modal ──
+    const closeModal = () => modal.remove();
+    modal.querySelector('#_fwd_close').addEventListener('click', closeModal);
+    modal.querySelector('#_fwd_cancel').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 }
 
-// ── Thực hiện forward ──
+// ── Forward tới DM ──
 async function doForwardMessage(text, targetId, targetUsername) {
-    // Nếu đang chat với người đó thì gửi luôn
     if (currentChat.partnerId === targetId && currentChat.sharedSecret) {
-        const signature   = await signMessage(text, myIdentity.signingPrivateKey);
-        const encrypted   = await encryptMessage(text, currentChat.sharedSecret);
+        const sig = await signMessage(text, myIdentity.signingPrivateKey);
+        const enc = await encryptMessage(text, currentChat.sharedSecret);
         socket.emit('send_message', {
-            recipientId:      targetId,
-            encryptedContent: encrypted.ciphertext,
-            iv:               encrypted.iv,
-            signature
+            recipientId: targetId, encryptedContent: enc.ciphertext, iv: enc.iv, signature: sig
         });
         appendMessage(text, 'sent', null, new Date(), null, true);
         return;
     }
-
-    // Nếu chưa thiết lập sharedSecret với người đó → cần handshake trước
-    // Lưu pending forward để thực hiện sau khi handshake xong
     pendingForward = { text, targetId };
     startHandshake(targetUsername);
+}
+
+// ── Forward tới nhóm ──
+async function doForwardToGroup(text, groupId) {
+    const groupKey = await getGroupKey(groupId);
+    if (!groupKey) return;
+    try {
+        const sig = await signMessage(text, myIdentity.signingPrivateKey);
+        const enc = await encryptMessage(text, groupKey);
+        socket.emit('send_group_message', {
+            groupId,
+            encryptedContent: enc.ciphertext,
+            iv: enc.iv,
+            signature: sig
+        });
+        // Chỉ hiện tin trong chat nếu đang xem nhóm đó
+        if (currentGroupId === groupId) {
+            appendMessage(text, 'sent', null, new Date(), null, true);
+        }
+    } catch (e) {
+        console.error('Forward to group error:', e);
+    }
 }
 
 // [MỚI] Cập nhật dòng preview "Tin nhắn mới" ở sidebar
@@ -1349,7 +1468,9 @@ async function decryptGroupKey(encryptedGroupKeyB64, keyIvB64, keyHolderPublicKe
     const iv           = base64ToArrayBuffer(keyIvB64);
     const data         = base64ToArrayBuffer(encryptedGroupKeyB64);
     const rawKey       = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv }, sharedSecret, data);
-    return await window.crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+    // extractable: true — cần để admin có thể exportKey khi thêm member mới
+    // (encryptGroupKeyForMember cần exportKey('raw', groupKey))
+    return await window.crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
 }
 
 // Lấy group key (từ cache hoặc fetch + decrypt)
