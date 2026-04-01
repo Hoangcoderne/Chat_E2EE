@@ -383,6 +383,13 @@ io.on('connection', (socket) => {
         io.to(removedUserId).emit('group_kicked', { groupId });
     });
 
+    // Broadcast xoá tin nhắn nhóm real-time
+    socket.on('broadcast_delete_group_message', ({ groupId, messageId }) => {
+        if (!socket.userId) return;
+        // socket.to() thay vì io.to() — sender đã tự remove rồi, không cần gửi lại
+        socket.to('group:' + groupId).emit('message_deleted', { messageId });
+    });
+
     // [FIX BUG 5] Broadcast group reaction
     socket.on('broadcast_group_reaction', ({ groupId, messageId, reactions }) => {
         if (!socket.userId) return;
@@ -455,7 +462,6 @@ io.on('connection', (socket) => {
                 fromUser: socket.username,
                 fromId: socket.userId
             });
-
             const notifContent = `Đã gửi lời mời tới ${targetUsername}`;
             await User.findByIdAndUpdate(socket.userId, {
                 $push: { notifications: { content: notifContent, type: 'friend_request_sent' } }

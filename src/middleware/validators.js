@@ -95,11 +95,15 @@ const verifyRecoveryValidation = [
 ];
 
 // POST /api/auth/reset-password
+// Client gửi: newSalt, newAuthKeyHash, newEncryptedPrivateKey, newIv
+// KHÔNG validate 'salt' hay 'authKeyHash' (là field của login, khác với reset)
 const resetPasswordValidation = [
     validateUsername,
     validateRecoveryKey,
-    validateSalt,
-    validateAuthKeyHash,
+    body('newSalt').notEmpty().withMessage('Thiếu newSalt')
+        .isString().isLength({ min: 10, max: 200 }).withMessage('newSalt không hợp lệ'),
+    body('newAuthKeyHash').notEmpty().withMessage('Thiếu newAuthKeyHash')
+        .isString().isLength({ min: 20, max: 600 }).withMessage('newAuthKeyHash không hợp lệ'),
     body('newEncryptedPrivateKey').notEmpty().withMessage('Thiếu newEncryptedPrivateKey'),
     body('newIv').notEmpty().withMessage('Thiếu newIv'),
     handleValidationErrors

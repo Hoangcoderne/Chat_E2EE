@@ -224,3 +224,8 @@ async function decryptAndImportSigningKey(encryptedBase64, ivBase64, encryptionK
         ['sign']
     );
 }
+
+// Nút đến login ở bước 3 — không dùng onclick inline (CSP violation)
+document.getElementById('btn-to-login')?.addEventListener('click', () => {
+    window.location.href = '/login.html';
+});
