@@ -27,6 +27,9 @@ router.post('/:groupId/add-member',    authMiddleware, groupController.addMember
 router.post('/:groupId/remove-member', authMiddleware, groupController.removeMember);
 router.post('/:groupId/leave',         authMiddleware, groupController.leaveGroup);
 
+// Xoá tin nhắn nhóm (chỉ người gửi)
+router.post('/message/delete',   authMiddleware, groupController.deleteGroupMessage);
+
 // Toggle reaction cho group message
 router.post('/message/reaction', authMiddleware, groupController.toggleGroupReaction);
 

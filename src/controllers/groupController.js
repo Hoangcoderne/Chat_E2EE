@@ -130,6 +130,7 @@ exports.getGroupHistory = async (req, res) => {
 
         const messages = await GroupMessage.find({ groupId })
             .populate('sender', 'username _id')
+            .populate('readBy', 'username _id')   // populate để client có username hiển thị seen list
             .sort({ timestamp: 1 });
 
         // Đánh dấu đã đọc
@@ -340,3 +341,34 @@ exports.toggleGroupReaction = async (req, res) => {
         res.status(500).json({ success: false, message: 'Lỗi server.' });
     }
 };
+
+// ── Xoá tin nhắn nhóm hoàn toàn (chỉ người gửi) ──────────────
+// POST /api/groups/message/delete
+exports.deleteGroupMessage = async (req, res) => {
+    try {
+        const { messageId } = req.body;
+        const currentUserId  = req.user.userId;
+
+        if (!messageId || !mongoose.Types.ObjectId.isValid(messageId))
+            return res.status(400).json({ success: false, message: 'messageId không hợp lệ.' });
+
+        const GroupMessage = require('../models/GroupMessage');
+        const msg = await GroupMessage.findById(messageId);
+        if (!msg)
+            return res.status(404).json({ success: false, message: 'Tin nhắn không tồn tại.' });
+
+        // Chỉ người gửi được xoá
+        if (msg.sender.toString() !== currentUserId)
+            return res.status(403).json({ success: false, message: 'Bạn không có quyền xoá tin nhắn này.' });
+
+        const groupId = msg.groupId.toString();
+        await GroupMessage.findByIdAndDelete(messageId);
+
+        res.json({ success: true, messageId, groupId });
+    } catch (err) {
+        console.error('Delete group message error:', err);
+        res.status(500).json({ success: false, message: 'Lỗi server.' });
+    }
+};
+
+// ── Xoá tin nhắn nhóm (chỉ người gửi) ───────────────────────

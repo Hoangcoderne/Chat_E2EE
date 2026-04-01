@@ -179,7 +179,7 @@ function resetUnreadBadge(userId) {
 function loadKeyFromDB(id = 'my-private-key') {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open("SecureChatDB", 1);
-        // Tạo object store nếu chưa có 
+        // Tạo object store nếu chưa có (tab ẩn danh, DB mới, hoặc version mismatch)
         request.onupgradeneeded = (e) => {
             const db = e.target.result;
             if (!db.objectStoreNames.contains("keys")) {
@@ -493,10 +493,7 @@ socket.on('reaction_updated', ({ messageId, reactions }) => {
 
 // [FIX #1] Thêm handler cho request_sent_success
 socket.on('request_sent_success', (msg) => {
-    notifications.unshift({
-        _id: 'temp_' + Date.now(),
-        content: msg
-    });
+    notifications.unshift({ _id: 'temp_' + Date.now(), content: msg });
     updateRequestUI();
 });
 
@@ -767,12 +764,14 @@ function updateRequestUI() {
 
 // appendMessage với timestamp, read status, action buttons, reactions
 // isTemp=true: tin vừa gửi, chờ sync từ server để gán msgId thật
-function appendMessage(text, type, signatureValid = null, timestamp = null, msgId = null, isTemp = false, reactions = []) {
+// groupId: truyền vào nếu là tin nhắn nhóm, lưu vào dataset để doDeleteMessage dùng đúng endpoint
+function appendMessage(text, type, signatureValid = null, timestamp = null, msgId = null, isTemp = false, reactions = [], groupId = null) {
     const wrapper = document.createElement('div');
     wrapper.className = 'msg-wrapper ' + (type === 'sent' ? 'wrapper-sent' : type === 'system' ? 'wrapper-system' : 'wrapper-received');
 
-    if (msgId)   wrapper.dataset.msgId = msgId;
-    if (isTemp)  wrapper.dataset.temp  = 'true';
+    if (msgId)   wrapper.dataset.msgId   = msgId;
+    if (isTemp)  wrapper.dataset.temp    = 'true';
+    if (groupId) wrapper.dataset.groupId = groupId;   // Lưu groupId để xác định endpoint khi xoá
     // Lưu plaintext để forward
     if (text && type !== 'system') wrapper.dataset.plaintext = text;
 
@@ -845,15 +844,25 @@ function appendMessage(text, type, signatureValid = null, timestamp = null, msgI
     if (type !== 'system') {
         const meta = document.createElement('div');
         meta.className = 'msg-meta ' + (type === 'sent' ? 'meta-sent' : 'meta-received');
+
         const timeEl = document.createElement('span');
         timeEl.className = 'msg-time';
         timeEl.textContent = formatTime(timestamp || new Date());
         meta.appendChild(timeEl);
+
         if (type === 'sent') {
-            const statusEl = document.createElement('span');
-            statusEl.className = 'msg-status';
-            statusEl.textContent = '✓';
-            meta.appendChild(statusEl);
+            if (groupId) {
+                // Group: seen-list (thay ✓✓)
+                const seenList = document.createElement('div');
+                seenList.className = 'group-seen-list';
+                meta.appendChild(seenList);
+            } else {
+                // DM: dấu tích truyền thống
+                const statusEl = document.createElement('span');
+                statusEl.className = 'msg-status';
+                statusEl.textContent = '✓';
+                meta.appendChild(statusEl);
+            }
         }
         wrapper.appendChild(meta);
     }
@@ -913,12 +922,37 @@ function showEmojiPicker(e, wrapper) {
         picker.appendChild(btn);
     });
 
-    // Vị trí: dựa vào nút cảm xúc
-    const btnRect = e.currentTarget.getBoundingClientRect();
+    // Append trước để đọc được kích thước thật của picker
     picker.style.position = 'fixed';
-    picker.style.top  = (btnRect.top - 52) + 'px';
-    picker.style.left = (btnRect.left - 60) + 'px';
+    picker.style.visibility = 'hidden';  // Ẩn tạm khi tính toán
     document.body.appendChild(picker);
+
+    const btnRect   = e.currentTarget.getBoundingClientRect();
+    const pickerW   = picker.offsetWidth;
+    const pickerH   = picker.offsetHeight;
+    const margin    = 6;   // khoảng cách giữa picker và nút
+    const padding   = 8;   // cách lề màn hình
+
+    // Mặc định: picker hiện phía trên nút, căn giữa theo nút
+    let top  = btnRect.top - pickerH - margin;
+    let left = btnRect.left + btnRect.width / 2 - pickerW / 2;
+
+    // Tràn lên trên → hiện phía dưới nút
+    if (top < padding) {
+        top = btnRect.bottom + margin;
+    }
+    // Tràn sang trái
+    if (left < padding) {
+        left = padding;
+    }
+    // Tràn sang phải
+    if (left + pickerW > window.innerWidth - padding) {
+        left = window.innerWidth - pickerW - padding;
+    }
+
+    picker.style.top        = `${top}px`;
+    picker.style.left       = `${left}px`;
+    picker.style.visibility = '';   // Hiện picker sau khi đã định vị
     activeEmojiPicker = picker;
 }
 
@@ -979,7 +1013,15 @@ function closeAllPopups() {
 // ── Xoá tin nhắn ──
 async function doDeleteMessage(msgId, wrapper) {
     try {
-        const res = await authFetch('/api/chat/message/delete', {
+        // [FIX] Đọc groupId từ dataset của wrapper — không dùng currentGroupId
+        // vì user có thể đã chuyển tab/DM trước khi click Delete
+        const groupId = wrapper.dataset.groupId || null;
+        const isGroup = !!groupId;
+        const endpoint = isGroup
+            ? '/api/groups/message/delete'
+            : '/api/chat/message/delete';
+
+        const res = await authFetch(endpoint, {
             method: 'POST',
             body: JSON.stringify({ messageId: msgId })
         });
@@ -987,12 +1029,21 @@ async function doDeleteMessage(msgId, wrapper) {
         const data = await res.json();
         if (!data.success) return alert(data.message || 'Xoá thất bại');
 
-        // Broadcast real-time cho recipient
-        socket.emit('broadcast_delete_message', {
-            messageId: msgId,
-            recipientId: data.recipientId
-        });
-        // Xoá khỏi UI của chính mình
+        if (isGroup) {
+            // Broadcast xoá tới toàn bộ nhóm qua socket room
+            socket.emit('broadcast_delete_group_message', {
+                groupId:   groupId,   // dùng local var, không phụ thuộc API response
+                messageId: msgId
+            });
+        } else {
+            // DM: broadcast tới recipient + thiết bị khác của mình
+            socket.emit('broadcast_delete_message', {
+                messageId:   msgId,
+                recipientId: data.recipientId
+            });
+        }
+
+        // Xoá khỏi UI của chính mình ngay
         wrapper.remove();
     } catch (err) {
         console.error('Delete error:', err);
@@ -1295,7 +1346,7 @@ async function sendMessage() {
         });
 
         // [MỚI] isTemp=true: hiện ngay, chờ message_sent_sync gán msgId thật
-        appendMessage(text, 'sent', null, new Date(), null, true);
+        appendMessage(text, 'sent', null, new Date(), null, true, [], currentGroupId);
         dom.msgInput.value = '';
     } catch (err) {
         console.error("Lỗi gửi tin:", err);
@@ -1624,13 +1675,17 @@ async function loadGroupHistory(groupId) {
                 const text = await decryptMessage({ ciphertext: msg.encryptedContent, iv: msg.iv }, groupKey);
                 const isMine = msg.sender._id === myIdentity.userId || msg.sender._id?.toString() === myIdentity.userId;
                 const type   = isMine ? 'sent' : 'received';
-                const wrapper = appendMessage(text, type, null, msg.timestamp, msg._id, false, msg.reactions || []);
-                // Hiện tên người gửi cho tin nhận
+                const wrapper = appendMessage(text, type, null, msg.timestamp, msg._id, false, msg.reactions || [], groupId);
+                // Tên người gửi cho tin nhận
                 if (!isMine && wrapper) {
                     const senderLabel = document.createElement('div');
                     senderLabel.className = 'group-sender-label';
                     senderLabel.textContent = msg.sender.username || '';
                     wrapper.insertBefore(senderLabel, wrapper.firstChild);
+                }
+                // Seen list cho tin mình gửi
+                if (isMine && wrapper && msg.readBy) {
+                    renderSeenListFromHistory(wrapper, msg.readBy, myIdentity.userId);
                 }
             } catch (e) {
                 appendMessage('[Lỗi giải mã]', 'system');
@@ -1665,7 +1720,7 @@ async function sendGroupMessage() {
             signature
         });
 
-        appendMessage(text, 'sent', null, new Date(), null, true);
+        appendMessage(text, 'sent', null, new Date(), null, true, [], currentGroupId);
         dom.msgInput.value = '';
     } catch (err) {
         console.error('sendGroupMessage error:', err);
@@ -1696,7 +1751,7 @@ socket.on('receive_group_message', async (payload) => {
     try {
         const groupKey = await getGroupKey(groupId);
         const text     = await decryptMessage({ ciphertext: encryptedContent, iv }, groupKey);
-        const wrapper  = appendMessage(text, 'received', null, timestamp, messageId, false, reactions || []);
+        const wrapper  = appendMessage(text, 'received', null, timestamp, messageId, false, reactions || [], groupId);
         if (wrapper) {
             const senderLabel = document.createElement('div');
             senderLabel.className = 'group-sender-label';
@@ -1768,51 +1823,105 @@ socket.on('group_invited', async ({ groupId, groupName, memberCount }) => {
     }
 });
 
-// [FIX BUG 1] Nhận thông báo ai đó đã đọc tin nhắn nhóm
+// Nhận thông báo ai đó đã đọc tin nhắn nhóm
 socket.on('group_read_update', ({ groupId, userId, username }) => {
     if (currentGroupId !== groupId) return;
-    // Cập nhật seen indicator ở cuối danh sách tin nhắn
-    renderGroupSeenIndicator(username);
+    // Thêm username vào seen list của tin nhắn cuối trong nhóm
+    updateLastMsgSeenList(username);
 });
 
-// ── Hiện dòng "Đã xem: username" dưới tin nhắn cuối trong group ──
-function renderGroupSeenIndicator(username) {
-    // Xóa indicator cũ của user này nếu có
-    document.querySelectorAll(`.group-seen-item[data-user="${username}"]`)
-        .forEach(el => el.remove());
+// ── Cập nhật seen-list trong tin nhắn sent cuối cùng ──
+function updateLastMsgSeenList(username) {
+    // Tìm tin nhắn sent cuối cùng (chỉ tin mình gửi mới hiện seen)
+    const sentWrappers = [...dom.messagesList.querySelectorAll('.msg-wrapper.wrapper-sent')];
+    if (sentWrappers.length === 0) return;
+    const lastSent = sentWrappers[sentWrappers.length - 1];
+    const seenList = lastSent.querySelector('.group-seen-list');
+    if (!seenList) return;
 
-    // Lấy wrapper của tin nhắn cuối cùng trong danh sách
-    const wrappers = dom.messagesList.querySelectorAll('.msg-wrapper');
-    if (wrappers.length === 0) return;
-    const lastWrapper = wrappers[wrappers.length - 1];
+    // Không trùng lặp
+    if (seenList.querySelector(`[data-user="${username}"]`)) return;
 
-    // Tìm hoặc tạo seen-bar bên dưới wrapper cuối
-    let seenBar = dom.messagesList.querySelector('.group-seen-bar');
-    if (!seenBar) {
-        seenBar = document.createElement('div');
-        seenBar.className = 'group-seen-bar';
-        dom.messagesList.appendChild(seenBar);
-    }
-    // Di chuyển seenBar xuống sau wrapper cuối
-    dom.messagesList.insertBefore(seenBar, lastWrapper.nextSibling);
+    // Lấy danh sách users hiện tại
+    const existing = [...seenList.querySelectorAll('[data-user]')].map(el => el.dataset.user);
+    existing.push(username);
 
-    const item = document.createElement('span');
-    item.className   = 'group-seen-item';
-    item.dataset.user = username;
-    item.textContent  = username;
-    seenBar.appendChild(item);
-
-    // Giới hạn hiện tối đa 3 người, còn lại hiện "+N"
-    const items = seenBar.querySelectorAll('.group-seen-item:not(.group-seen-more)');
-    if (items.length > 3) {
-        const more = seenBar.querySelector('.group-seen-more') || document.createElement('span');
-        more.className   = 'group-seen-item group-seen-more';
-        more.textContent  = `+${items.length - 3}`;
-        seenBar.appendChild(more);
-        items.forEach((el, i) => { el.style.display = i < 3 ? '' : 'none'; });
-    }
-
+    renderSeenList(seenList, existing);
     dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
+}
+
+// ── Render seen-list với logic collapse/expand ──
+// users: string[] — danh sách username đã xem
+function renderSeenList(container, users) {
+    if (!users || users.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    // Lấy trạng thái expanded hiện tại
+    const isExpanded = container.dataset.expanded === 'true';
+    const MAX_SHOWN  = 3;
+
+    container.innerHTML = '';
+
+    if (users.length === 0) return;
+
+    const shown   = isExpanded ? users : users.slice(0, MAX_SHOWN);
+    const overflow = users.length - MAX_SHOWN;
+
+    // Prefix nhỏ "👁"
+    const eye = document.createElement('span');
+    eye.className   = 'seen-eye';
+    eye.textContent = '👁';
+    container.appendChild(eye);
+
+    // Các avatar/chip người đã xem
+    shown.forEach(uname => {
+        const chip = document.createElement('span');
+        chip.className       = 'seen-chip';
+        chip.dataset.user    = uname;
+        chip.title           = uname;
+        chip.textContent     = uname[0].toUpperCase();
+        container.appendChild(chip);
+    });
+
+    // Nút +N (khi collapse và có overflow)
+    if (!isExpanded && overflow > 0) {
+        const more = document.createElement('span');
+        more.className   = 'seen-chip seen-more';
+        more.textContent = `+${overflow}`;
+        container.appendChild(more);
+    }
+
+    // Click để toggle expand/collapse
+    if (users.length > MAX_SHOWN) {
+        container.style.cursor = 'pointer';
+        container.onclick = (e) => {
+            e.stopPropagation();
+            container.dataset.expanded = isExpanded ? 'false' : 'true';
+            // Lưu lại danh sách users vào dataset
+            renderSeenList(container, users);
+        };
+    } else {
+        container.style.cursor = 'default';
+        container.onclick = null;
+    }
+}
+
+// ── Render seen list cho tin nhắn khi load history ──
+function renderSeenListFromHistory(wrapper, readBy, senderId) {
+    const seenList = wrapper.querySelector('.group-seen-list');
+    if (!seenList) return;
+
+    // Lọc bỏ bản thân (người gửi) ra khỏi danh sách đã xem
+    const viewers = (readBy || [])
+        .filter(u => {
+            const uid = u._id || u;
+            return uid?.toString() !== senderId?.toString();
+        })
+        .map(u => u.username || u.toString());
+
+    renderSeenList(seenList, viewers);
 }
 
 socket.on('group_kicked', ({ groupId }) => {

@@ -1004,33 +1004,56 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
 .btn-remove-member:hover { background: #fff0f0; }
 
 /* ════════════════════════════════════════════════════
-   [FIX BUG 1] GROUP SEEN INDICATOR
+   GROUP SEEN LIST — per-message, thay dấu tích
    ════════════════════════════════════════════════════ */
 
-.group-seen-bar {
-    display: flex;
+/* Container nằm trong .msg-meta, cùng hàng với timestamp */
+.group-seen-list {
+    display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 0 4px 4px;
-    flex-wrap: wrap;
+    gap: 3px;
+    margin-left: 4px;
+    user-select: none;
 }
-.group-seen-bar::before {
-    content: '👁 Đã xem:';
-    font-size: 10.5px;
-    color: #aaa;
-    margin-right: 2px;
+
+/* Icon mắt nhỏ */
+.seen-eye {
+    font-size: 10px;
+    opacity: .55;
+    flex-shrink: 0;
 }
-.group-seen-item {
-    font-size: 10.5px;
-    color: #888;
-    background: #f0f0f0;
+
+/* Avatar chip tròn — chứa chữ cái đầu username */
+.seen-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #bdd4f5;
+    color: #1a56db;
+    font-size: 9px;
+    font-weight: 700;
+    flex-shrink: 0;
+    transition: background .12s, transform .1s;
+}
+
+/* Chip +N */
+.seen-chip.seen-more {
+    background: #e2e8f0;
+    color: #64748b;
+    font-size: 9px;
+    font-weight: 600;
+    width: auto;
+    padding: 0 4px;
     border-radius: 99px;
-    padding: 1px 7px;
-    font-weight: 500;
 }
-.group-seen-more {
-    color: #aaa;
-    background: none;
+
+/* Hover toàn bộ list → gợi ý có thể click */
+.group-seen-list[style*="pointer"] .seen-chip:hover {
+    background: #93c5fd;
+    transform: scale(1.1);
 }
 
 /* ════════════════════════════════════════════════════
