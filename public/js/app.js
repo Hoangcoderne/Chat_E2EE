@@ -348,6 +348,7 @@ socket.on('receive_message', async (payload) => {
     // Nếu đang chat với người này → hiện tin + mark read ngay
     if (payload.senderId === currentChat.partnerId) {
         try {
+            clearEmptyState();
             const decryptedText = await decryptMessage(
                 { ciphertext: payload.encryptedContent, iv: payload.iv },
                 currentChat.sharedSecret
@@ -529,7 +530,7 @@ async function loadChatHistory() {
         dom.messagesList.innerHTML = '';
 
         if (messages.length === 0) {
-            dom.messagesList.innerHTML = '<div class="system-msg">Chưa có tin nhắn nào.</div>';
+            dom.messagesList.innerHTML = '<div class="system-msg empty-state-msg">Chưa có tin nhắn nào.</div>';
             return;
         }
 
@@ -1302,13 +1303,16 @@ async function doForwardToGroup(text, groupId) {
     }
 }
 
+// ── Xoá thông báo "Chưa có tin nhắn nào." trước khi hiện tin mới ──
+function clearEmptyState() {
+    // Chỉ xoá phần tử có class empty-state-msg (placeholder "Chưa có tin nhắn nào.")
+    // Không dùng .system-msg vì class đó còn dùng cho E2EE notice, loading...
+    dom.messagesList.querySelectorAll('.empty-state-msg').forEach(el => el.remove());
+}
+
 // ── System message full-width trong group chat ──
 function appendGroupSystemMessage(text) {
-    // Xoá dòng "Chưa có tin nhắn nào." nếu còn
-    const emptyMsg = dom.messagesList.querySelector('.system-msg');
-    if (emptyMsg && dom.messagesList.querySelectorAll('.msg-wrapper').length === 0) {
-        emptyMsg.remove();
-    }
+    clearEmptyState();
     const div = document.createElement('div');
     div.className   = 'group-system-event';
     div.textContent = text;
@@ -1359,6 +1363,7 @@ async function sendMessage() {
             signature
         });
 
+        clearEmptyState();
         // [MỚI] isTemp=true: hiện ngay, chờ message_sent_sync gán msgId thật
         appendMessage(text, 'sent', null, new Date(), null, true, [], currentGroupId);
         dom.msgInput.value = '';
@@ -1677,7 +1682,7 @@ async function loadGroupHistory(groupId) {
 
         dom.messagesList.innerHTML = '';
         if (messages.length === 0) {
-            dom.messagesList.innerHTML = '<div class="system-msg">Chưa có tin nhắn nào trong nhóm.</div>';
+            dom.messagesList.innerHTML = '<div class="system-msg empty-state-msg">Chưa có tin nhắn nào trong nhóm.</div>';
             return;
         }
 
@@ -1737,6 +1742,7 @@ async function sendGroupMessage() {
             signature
         });
 
+        clearEmptyState();
         appendMessage(text, 'sent', null, new Date(), null, true, [], currentGroupId);
         dom.msgInput.value = '';
     } catch (err) {
@@ -1766,11 +1772,7 @@ socket.on('receive_group_message', async (payload) => {
 
     // Đang xem nhóm này → giải mã và hiện
     try {
-        // [FIX BUG 2] Xoá dòng "Chưa có tin nhắn nào." nếu còn đó
-        const emptyMsg = dom.messagesList.querySelector('.system-msg');
-        if (emptyMsg && dom.messagesList.querySelectorAll('.msg-wrapper').length === 0) {
-            emptyMsg.remove();
-        }
+        clearEmptyState();
         const groupKey = await getGroupKey(groupId);
         const text     = await decryptMessage({ ciphertext: encryptedContent, iv }, groupKey);
         const wrapper  = appendMessage(text, 'received', null, timestamp, messageId, false, reactions || [], groupId);
@@ -2356,7 +2358,8 @@ async function removeMemberFromGroup(groupId, userId, username) {
             removedName: data.removedName || username
         });
         await loadManageModal(groupId);
-        appendGroupSystemMessage(`${data.removedName || username} đã bị xóa khỏi nhóm`);
+        // Không gọi appendGroupSystemMessage ở đây — socket 'group_member_removed'
+        // sẽ hiện system message (kể cả cho chính admin đã xoá)
     } else {
         errEl.textContent = data.message;
         errEl.classList.remove('hidden');

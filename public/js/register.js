@@ -71,8 +71,37 @@ passwordInput.addEventListener('input', () => {
 });
 
 // ============================================================
-// PHASE 1 — Form submit: validate + generate keys + hiện recovery key
-// KHÔNG gọi API ở bước này
+// ── Validate username format client-side ──
+function validateUsernameFormat(username) {
+    const errors = [];
+    if (username.length < 3 || username.length > 20)
+        errors.push('Từ 3–20 ký tự');
+    if (/\s/.test(username))
+        errors.push('Không được có dấu cách');
+    if (/[àáảãạăắặẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i.test(username))
+        errors.push('Không được có dấu tiếng Việt');
+    if (!/^[a-zA-Z0-9_-]+$/.test(username))
+        errors.push('Chỉ dùng chữ (a-z), số (0-9), dấu _ hoặc -');
+    return errors;
+}
+
+// Real-time username hint
+document.getElementById('username')?.addEventListener('input', function () {
+    const hint = document.getElementById('username-hint');
+    if (!hint) return;
+    const errors = validateUsernameFormat(this.value);
+    if (this.value.length === 0) { hint.textContent = ''; return; }
+    if (errors.length === 0) {
+        hint.textContent = '✓ Hợp lệ';
+        hint.style.color = '#22c55e';
+    } else {
+        hint.textContent = '✗ ' + errors[0];
+        hint.style.color = '#ef4444';
+    }
+});
+
+// ============================================================
+// PHASE 1 — Form submit: validate + check username + generate keys
 // ============================================================
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -80,6 +109,13 @@ form.addEventListener('submit', async (e) => {
     const username        = document.getElementById('username').value.trim();
     const password        = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirm-password').value;
+
+    // ── Validate username format ──
+    const unErrors = validateUsernameFormat(username);
+    if (unErrors.length > 0) {
+        showError('Tên đăng nhập không hợp lệ:\n• ' + unErrors.join('\n• '));
+        return;
+    }
 
     // ── Validate password strength ──
     const pwErrors = validatePasswordStrength(password);
@@ -90,6 +126,22 @@ form.addEventListener('submit', async (e) => {
 
     if (password !== confirmPassword) {
         showError('Mật khẩu xác nhận không khớp!');
+        return;
+    }
+
+    // ── Kiểm tra username đã tồn tại chưa TRƯỚC khi generate keys ──
+    setLoading(true, 'Đang kiểm tra tên đăng nhập...');
+    try {
+        const checkRes = await fetch(`/api/auth/salt?username=${encodeURIComponent(username)}`);
+        if (checkRes.status === 200) {
+            showError('Tên đăng nhập đã được sử dụng. Vui lòng chọn tên khác.');
+            setLoading(false, 'Đăng ký & Tạo Khóa');
+            return;
+        }
+        // 404 = chưa tồn tại → tiếp tục
+    } catch (err) {
+        showError('Không thể kết nối server. Vui lòng thử lại.');
+        setLoading(false, 'Đăng ký & Tạo Khóa');
         return;
     }
 
@@ -171,7 +223,13 @@ async function doRegister() {
         });
 
         const result = await res.json();
-        if (!res.ok) throw new Error(result.message || 'Đăng ký thất bại');
+        if (!res.ok) {
+            // Hiện đúng lỗi từ server (validation error, duplicate username, v.v.)
+            const msg = result.errors
+                ? result.errors.map(e => e.message).join(', ')  // VALIDATION_ERROR
+                : (result.message || 'Đăng ký thất bại');
+            throw new Error(msg);
+        }
 
         // Xoá payload khỏi bộ nhớ
         pendingPayload = null;
@@ -242,13 +300,8 @@ function showRecoveryStep(recoveryDisplay) {
         <!-- Checkbox xác nhận -->
         <div style="margin-bottom: 16px;">
             <label style="display:flex; align-items:flex-start; gap:8px; text-align:left; font-size:0.85em; cursor:pointer; line-height:1.5">
-                <div style="flex:2; display:flex; justify-content:center;">
-                    <input type="checkbox" id="confirm-saved">
-                </div>
-
-                <span style="flex:8">
-                    Tôi đã sao chép và lưu Recovery Key ở nơi an toàn. Tôi hiểu rằng nếu mất key này, tôi không thể khôi phục tài khoản.
-                </span>
+                <input type="checkbox" id="confirm-saved" style="margin-top:2px; flex-shrink:0">
+                <span>Tôi đã sao chép và lưu Recovery Key ở nơi an toàn. Tôi hiểu rằng nếu mất key này, tôi không thể khôi phục tài khoản.</span>
             </label>
         </div>
 

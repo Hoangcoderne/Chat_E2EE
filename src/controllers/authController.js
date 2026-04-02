@@ -2,8 +2,8 @@
 const User = require('../models/User');
 const RefreshToken = require('../models/RefreshToken');
 const jwt = require('jsonwebtoken');
-const logger = require('../utils/logger');                        // [MỚI]
-const { hashToken, generateRefreshToken, hashPassword, verifyPassword } = require('../utils/crypto'); // [MỚI]
+const logger = require('../utils/logger');                        
+const { hashToken, generateRefreshToken, hashPassword, verifyPassword } = require('../utils/crypto'); 
 
 // ============================================================
 // HELPER: Tạo & lưu Refresh Token, set HttpOnly Cookie
