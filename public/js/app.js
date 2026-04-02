@@ -1302,6 +1302,20 @@ async function doForwardToGroup(text, groupId) {
     }
 }
 
+// ── System message full-width trong group chat ──
+function appendGroupSystemMessage(text) {
+    // Xoá dòng "Chưa có tin nhắn nào." nếu còn
+    const emptyMsg = dom.messagesList.querySelector('.system-msg');
+    if (emptyMsg && dom.messagesList.querySelectorAll('.msg-wrapper').length === 0) {
+        emptyMsg.remove();
+    }
+    const div = document.createElement('div');
+    div.className   = 'group-system-event';
+    div.textContent = text;
+    dom.messagesList.appendChild(div);
+    dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
+}
+
 // [MỚI] Cập nhật dòng preview "Tin nhắn mới" ở sidebar
 function updateContactPreview(userId) {
     const el = document.getElementById(`preview-${userId}`);
@@ -1672,18 +1686,21 @@ async function loadGroupHistory(groupId) {
 
         for (const msg of messages) {
             try {
+                // [BUG 3] System message từ DB — hiện full-width, không giải mã
+                if (msg.type === 'system' && msg.systemText) {
+                    appendGroupSystemMessage(msg.systemText);
+                    continue;
+                }
                 const text = await decryptMessage({ ciphertext: msg.encryptedContent, iv: msg.iv }, groupKey);
                 const isMine = msg.sender._id === myIdentity.userId || msg.sender._id?.toString() === myIdentity.userId;
                 const type   = isMine ? 'sent' : 'received';
                 const wrapper = appendMessage(text, type, null, msg.timestamp, msg._id, false, msg.reactions || [], groupId);
-                // Tên người gửi cho tin nhận
                 if (!isMine && wrapper) {
                     const senderLabel = document.createElement('div');
                     senderLabel.className = 'group-sender-label';
                     senderLabel.textContent = msg.sender.username || '';
                     wrapper.insertBefore(senderLabel, wrapper.firstChild);
                 }
-                // Seen list cho tin mình gửi
                 if (isMine && wrapper && msg.readBy) {
                     renderSeenListFromHistory(wrapper, msg.readBy, myIdentity.userId);
                 }
@@ -1749,6 +1766,11 @@ socket.on('receive_group_message', async (payload) => {
 
     // Đang xem nhóm này → giải mã và hiện
     try {
+        // [FIX BUG 2] Xoá dòng "Chưa có tin nhắn nào." nếu còn đó
+        const emptyMsg = dom.messagesList.querySelector('.system-msg');
+        if (emptyMsg && dom.messagesList.querySelectorAll('.msg-wrapper').length === 0) {
+            emptyMsg.remove();
+        }
         const groupKey = await getGroupKey(groupId);
         const text     = await decryptMessage({ ciphertext: encryptedContent, iv }, groupKey);
         const wrapper  = appendMessage(text, 'received', null, timestamp, messageId, false, reactions || [], groupId);
@@ -1949,8 +1971,8 @@ socket.on('group_member_added', ({ groupId, memberCount }) => {
     }
 });
 
-socket.on('group_member_removed', ({ groupId, removedUserId }) => {
-    // [FIX BUG 4] Cập nhật sidebar member count
+socket.on('group_member_removed', ({ groupId, removedUserId, removedName, leavingName }) => {
+    // Cập nhật sidebar
     authFetch(`/api/groups/${groupId}/info`).then(async res => {
         if (!res) return;
         const g = await res.json();
@@ -1959,14 +1981,17 @@ socket.on('group_member_removed', ({ groupId, removedUserId }) => {
     });
 
     if (currentGroupId === groupId && removedUserId !== myIdentity.userId) {
-        appendMessage('Một thành viên đã rời nhóm', 'system');
-        // Cập nhật header status
+        // [BUG 3] Phân biệt bị xoá vs tự rời — dùng tên thật từ server
+        const systemText = leavingName
+            ? `${leavingName} đã rời khỏi nhóm`
+            : `${removedName || 'Thành viên'} đã bị xóa khỏi nhóm`;
+        appendGroupSystemMessage(systemText);
+
         authFetch(`/api/groups/${groupId}/info`).then(async res => {
             if (!res) return;
             const g = await res.json();
             dom.partnerStatus.innerText = `${g.members?.length || 0} thành viên`;
         });
-        // Reload manage modal nếu đang mở
         if (!dom.modalManageGroup.classList.contains('hidden')) loadManageModal(groupId);
     }
 });
@@ -2108,11 +2133,14 @@ async function submitCreateGroup() {
         // Render group item trong sidebar
         renderGroupItem({ ...group, members: group.members, unreadCount: 0 });
 
-        // Notify các thành viên
+        // [FIX BUG 1] Emit đúng newMemberIds để server gửi group_invited cho từng thành viên
+        const newMemberIds = memberPayloads
+            .map(m => m.userId.toString())
+            .filter(uid => uid !== myIdentity.userId); // bỏ creator (đã xử lý rồi)
         socket.emit('broadcast_group_member_added', {
-            groupId: group._id,
-            newMember: { _id: 'all', username: 'all' },
-            groupName: name
+            groupId:      group._id,
+            newMemberIds,
+            groupName:    name
         });
 
         // Đóng modal và chuyển sang tab nhóm
@@ -2145,7 +2173,10 @@ document.getElementById('btn-leave-group')?.addEventListener('click', async () =
     if (!res) return;
     const data = await res.json();
     if (data.success) {
-        socket.emit('broadcast_group_left', { groupId: currentGroupId });
+        socket.emit('broadcast_group_left', {
+            groupId:     currentGroupId,
+            leavingName: data.leavingName || myIdentity.username
+        });
         document.querySelector(`.group-item[data-group-id="${currentGroupId}"]`)?.remove();
         groupKeys.delete(currentGroupId);
         currentGroupId = null;
@@ -2319,9 +2350,13 @@ async function removeMemberFromGroup(groupId, userId, username) {
     if (!res) return;
     const data = await res.json();
     if (data.success) {
-        socket.emit('broadcast_group_member_removed', { groupId, removedUserId: userId });
+        socket.emit('broadcast_group_member_removed', {
+            groupId,
+            removedUserId: userId,
+            removedName: data.removedName || username
+        });
         await loadManageModal(groupId);
-        appendMessage(`${username} đã bị xoá khỏi nhóm`, 'system');
+        appendGroupSystemMessage(`${data.removedName || username} đã bị xóa khỏi nhóm`);
     } else {
         errEl.textContent = data.message;
         errEl.classList.remove('hidden');

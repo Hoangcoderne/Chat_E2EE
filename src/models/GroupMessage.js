@@ -10,11 +10,17 @@ const GroupMessageSchema = new mongoose.Schema({
     groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true },
     sender:  { type: mongoose.Schema.Types.ObjectId, ref: 'User',  required: true },
 
-    // Nội dung mã hoá bằng group key (AES-GCM)
-    encryptedContent: { type: String, required: true },
-    iv:               { type: String, required: true },
+    // [MỚI] Loại tin nhắn: 'message' (thường) hoặc 'system' (sự kiện nhóm)
+    type: { type: String, enum: ['message', 'system'], default: 'message' },
 
-    // Chữ ký ECDSA của người gửi (ký trên plaintext)
+    // [MỚI] Nội dung plain text cho system message (không mã hoá)
+    systemText: { type: String, default: null },
+
+    // Nội dung mã hoá bằng group key (AES-GCM) — chỉ dùng khi type='message'
+    encryptedContent: { type: String, required: false },
+    iv:               { type: String, required: false },
+
+    // Chữ ký ECDSA của người gửi
     signature: { type: String, required: false },
 
     // Ai đã đọc tin này

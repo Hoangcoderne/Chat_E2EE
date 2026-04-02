@@ -196,11 +196,25 @@ exports.removeMember = async (req, res) => {
         if (userId === adminId)       return res.status(400).json({ message: 'Không thể tự xoá chính mình. Hãy dùng "Rời nhóm".' });
         if (userId === group.creator.toString()) return res.status(400).json({ message: 'Không thể xoá người tạo nhóm' });
 
+        // Lấy username của người bị xoá để lưu system message
+        const removedUser = await User.findById(userId).select('username');
+        const removedName = removedUser?.username || 'Thành viên';
+
         group.members = group.members.filter(m => m.userId.toString() !== userId);
         group.admins  = group.admins.filter(id => id.toString() !== userId);
         await group.save();
 
-        res.json({ success: true });
+        // Lưu system message vào DB
+        await GroupMessage.create({
+            groupId,
+            sender: adminId,
+            type: 'system',
+            systemText: `${removedName} đã bị xóa khỏi nhóm`,
+            encryptedContent: 'system',
+            iv: 'system'
+        });
+
+        res.json({ success: true, removedName });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Lỗi server' });
@@ -222,6 +236,9 @@ exports.leaveGroup = async (req, res) => {
         if (group.creator.toString() === userId && group.members.length > 1)
             return res.status(400).json({ message: 'Trưởng nhóm phải chuyển quyền trước khi rời nhóm' });
 
+        const leavingUser = await User.findById(userId).select('username');
+        const leavingName = leavingUser?.username || 'Thành viên';
+
         group.members = group.members.filter(m => m.userId.toString() !== userId);
         group.admins  = group.admins.filter(id => id.toString() !== userId);
 
@@ -231,9 +248,18 @@ exports.leaveGroup = async (req, res) => {
             await GroupMessage.deleteMany({ groupId });
         } else {
             await group.save();
+            // Lưu system message
+            await GroupMessage.create({
+                groupId,
+                sender: userId,
+                type: 'system',
+                systemText: `${leavingName} đã rời khỏi nhóm`,
+                encryptedContent: 'system',
+                iv: 'system'
+            });
         }
 
-        res.json({ success: true });
+        res.json({ success: true, leavingName });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Lỗi server' });

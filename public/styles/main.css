@@ -1084,3 +1084,27 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     from { opacity: 0; transform: translateX(-50%) translateY(12px); }
     to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
+
+/* ════════════════════════════════════════════════════
+   GROUP SYSTEM EVENT — full-width, persistent
+   ════════════════════════════════════════════════════ */
+.group-system-event {
+    width: 100%;
+    text-align: center;
+    font-size: 12px;
+    color: #888;
+    padding: 6px 16px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-sizing: border-box;
+}
+/* Đường kẻ ngang hai bên text — full-width như khung chat */
+.group-system-event::before,
+.group-system-event::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e5e5e5;
+}

@@ -376,10 +376,11 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('broadcast_group_member_removed', ({ groupId, removedUserId }) => {
+    socket.on('broadcast_group_member_removed', ({ groupId, removedUserId, removedName }) => {
         if (!socket.userId) return;
-        io.to('group:' + groupId).emit('group_member_removed', { groupId, removedUserId });
-        // Kick user khỏi room
+        // Broadcast system event tới toàn nhóm (kèm tên để hiện system msg)
+        io.to('group:' + groupId).emit('group_member_removed', { groupId, removedUserId, removedName });
+        // Kick user bị xoá khỏi room
         io.to(removedUserId).emit('group_kicked', { groupId });
     });
 
@@ -417,10 +418,12 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('broadcast_group_left', ({ groupId }) => {
+    socket.on('broadcast_group_left', ({ groupId, leavingName }) => {
         if (!socket.userId) return;
         socket.to('group:' + groupId).emit('group_member_removed', {
-            groupId, removedUserId: socket.userId
+            groupId,
+            removedUserId: socket.userId,
+            leavingName   // tên người tự rời để phân biệt với bị xoá
         });
         socket.leave('group:' + groupId);
     });
