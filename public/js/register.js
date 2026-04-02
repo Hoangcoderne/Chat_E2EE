@@ -300,8 +300,12 @@ function showRecoveryStep(recoveryDisplay) {
         <!-- Checkbox xác nhận -->
         <div style="margin-bottom: 16px;">
             <label style="display:flex; align-items:flex-start; gap:8px; text-align:left; font-size:0.85em; cursor:pointer; line-height:1.5">
-                <input type="checkbox" id="confirm-saved" style="margin-top:2px; flex-shrink:0">
-                <span>Tôi đã sao chép và lưu Recovery Key ở nơi an toàn. Tôi hiểu rằng nếu mất key này, tôi không thể khôi phục tài khoản.</span>
+                <div style="flex:2; display:flex; justify-content:center;">
+                    <input type="checkbox" id="confirm-saved">
+                </div>
+                <span style="flex:8">
+                    Tôi đã sao chép và lưu Recovery Key ở nơi an toàn. Tôi hiểu rằng nếu mất key này, tôi không thể khôi phục tài khoản.
+                </span>
             </label>
         </div>
 
