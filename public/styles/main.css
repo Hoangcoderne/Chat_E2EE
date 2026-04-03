@@ -1137,7 +1137,7 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     /* Sidebar chiếm full màn hình mặc định */
     .sidebar {
         width: 100%;
-        max-width: 360px;    /* giới hạn chiều rộng tối đa */
+        max-width: 370px;    /* giới hạn chiều rộng tối đa */
         height: 100vh;
         position: fixed;
         top: 0; left: 0;
