@@ -30,9 +30,9 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
 .chat-input-area input { flex: 1; padding: 10px; font-size: 16px; }
 
 /* Message Bubble */
-.message { max-width: 60%; padding: 10px 15px; border-radius: 20px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
-.msg-sent { align-self: flex-end; background: #0084ff; color: white; border-bottom-right-radius: 2px; }
-.msg-received { align-self: flex-start; background: #e4e6eb; color: black; border-bottom-left-radius: 2px; }
+.message { max-width: 100%; padding: 10px 15px; border-radius: 20px; font-size: 14px; line-height: 1.4; word-break: break-word; overflow-wrap: anywhere; }
+.msg-sent { background: #0084ff; color: white; border-bottom-right-radius: 2px; }
+.msg-received { background: #e4e6eb; color: black; border-bottom-left-radius: 2px; }
 .system-msg { align-self: center; background: none; color: gray; font-size: 0.8em; }
 
 .hidden { display: none !important; }
@@ -312,10 +312,19 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     display: flex;
     flex-direction: column;
     max-width: 62%;
+    min-width: 0;  /* Ngăn flex child tràn ra ngoài */
 }
 .wrapper-sent     { align-self: flex-end;   align-items: flex-end; }
 .wrapper-received { align-self: flex-start; align-items: flex-start; }
 .wrapper-system   { align-self: center; }
+
+/* Bubble KHÔNG được rộng hơn wrapper */
+.msg-wrapper .message {
+    max-width: 100%;
+    min-width: 0;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
 
 /* Meta: thời gian + trạng thái đọc */
 .msg-meta {
@@ -373,9 +382,13 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     display: flex;
     align-items: flex-end;
     gap: 4px;
+    width: 100%;   /* Chiếm toàn bộ chiều rộng wrapper */
+    min-width: 0;
 }
-.row-sent     { flex-direction: row; }       /* actions ở TRÁI bubble */
-.row-received { flex-direction: row-reverse; } /* actions ở PHẢI bubble */
+.row-sent     { flex-direction: row; }
+.row-received { flex-direction: row-reverse; }
+/* Bubble trong row chiếm hết không gian còn lại sau action buttons */
+.msg-row .message { flex: 1; min-width: 0; }
 
 /* Container chứa 2 nút action */
 .msg-actions {

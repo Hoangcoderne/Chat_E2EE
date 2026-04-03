@@ -14,7 +14,6 @@ router.post('/unfriend',  authMiddleware, chatController.unfriend);
 router.post('/block',     authMiddleware, chatController.blockUser);
 router.post('/unblock',   authMiddleware, chatController.unblockUser);
 
-// ── [MỚI] Tin nhắn ──
 // Xoá tin nhắn hoàn toàn khỏi DB (chỉ người gửi được xoá)
 router.post('/message/delete',   authMiddleware, chatController.deleteMessage);
 

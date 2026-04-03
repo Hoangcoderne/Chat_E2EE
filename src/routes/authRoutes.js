@@ -7,7 +7,7 @@ const {
     registerValidation,
     verifyRecoveryValidation,
     resetPasswordValidation,
-} = require('../middleware/validators'); // [MỚI] Input validation
+} = require('../middleware/validators'); // Input validation
 
 // Đăng ký — validate input trước khi xử lý
 router.post('/register', registerValidation, authController.register);

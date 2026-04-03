@@ -179,7 +179,7 @@ function resetUnreadBadge(userId) {
 function loadKeyFromDB(id = 'my-private-key') {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open("SecureChatDB", 1);
-        // Tạo object store nếu chưa có (tab ẩn danh, DB mới, hoặc version mismatch)
+        // Tạo object store nếu chưa có 
         request.onupgradeneeded = (e) => {
             const db = e.target.result;
             if (!db.objectStoreNames.contains("keys")) {
