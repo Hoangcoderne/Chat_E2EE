@@ -1137,11 +1137,14 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     /* Sidebar chiếm full màn hình mặc định */
     .sidebar {
         width: 100%;
+        max-width: 360px;    /* giới hạn chiều rộng tối đa */
         height: 100vh;
         position: fixed;
         top: 0; left: 0;
         z-index: 10;
         transition: transform 0.25s ease;
+        padding: 12px;       /* padding nhỏ lại so với desktop 20px */
+        box-sizing: border-box;
     }
 
     /* Ẩn sidebar khi đang xem chat */
@@ -1168,5 +1171,25 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     /* Tin nhắn rộng hơn trên mobile */
     .message {
         max-width: 85%;
+    }
+
+    .avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 0.85em;
+    }
+
+    .contact-name {
+        font-size: 0.88em;
+    }
+
+    .last-message {
+        font-size: 0.72em;
+    }
+
+    /* Search box gọn hơn */
+    .search-box input {
+        padding: 6px;
+        font-size: 14px;
     }
 }

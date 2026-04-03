@@ -1686,6 +1686,11 @@ async function openGroupChat(group) {
     // Reset badge
     const badge = document.getElementById(`unread-group-${group._id}`);
     if (badge) { badge.textContent = ''; badge.classList.add('hidden'); }
+    if (window.innerWidth <= 768) {
+        dom.chatArea.classList.add('mobile-active');
+        document.querySelector('.sidebar').classList.add('mobile-hidden');
+        dom.btnBack.classList.remove('hidden');
+    }
 }
 
 // ── Load group message history ──
