@@ -67,7 +67,10 @@ const dom = {
     btnCreateGroup:      document.getElementById('btn-create-group'),
     btnManageGroup:      document.getElementById('btn-manage-group'),
     modalCreateGroup:    document.getElementById('modal-create-group'),
-    modalManageGroup:    document.getElementById('modal-manage-group')
+    modalManageGroup:    document.getElementById('modal-manage-group'),
+    //mobile
+    btnBack:  document.getElementById('btn-back'),    
+    chatArea: document.querySelector('.chat-area')
 };
 
 socket.on('connect', () => {
@@ -708,6 +711,12 @@ function renderContactItem(user) {
             dom.chatInputArea.classList.remove('hidden');
             dom.blockOverlay.classList.add('hidden');
             startHandshake(user.username);
+        }
+
+        if (window.innerWidth <= 768) {
+            dom.chatArea.classList.add('mobile-active');
+            document.querySelector('.sidebar').classList.add('mobile-hidden');
+            dom.btnBack.classList.remove('hidden');
         }
     });
 
@@ -1497,6 +1506,12 @@ dom.btnLogout.addEventListener('click', logout);
 dom.btnSend.addEventListener('click', sendMessage);
 dom.msgInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage();
+});
+
+dom.btnBack.addEventListener('click', () => {
+    dom.chatArea.classList.remove('mobile-active');
+    document.querySelector('.sidebar').classList.remove('mobile-hidden');
+    dom.btnBack.classList.add('hidden');
 });
 
 document.addEventListener('click', (e) => {

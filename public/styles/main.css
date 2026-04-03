@@ -16,7 +16,7 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     background: #e3f2fd;
     border-bottom: 1px solid #ddd;
     color: #0d47a1;
-    display: flex;              /* [FIX BUG 1] flex để đẩy icon sang phải */
+    display: flex;             
     align-items: center;
     justify-content: space-between;
 }
@@ -1120,4 +1120,53 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     flex: 1;
     height: 1px;
     background: #e5e5e5;
+}
+/* ════ MOBILE RESPONSIVE ════ */
+#btn-back {
+    display: none;          /* Ẩn trên desktop */
+    background: none;
+    border: none;
+    font-size: 1.4em;
+    cursor: pointer;
+    padding: 0 10px 0 0;
+    color: #0d47a1;
+    flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+    /* Sidebar chiếm full màn hình mặc định */
+    .sidebar {
+        width: 100%;
+        height: 100vh;
+        position: fixed;
+        top: 0; left: 0;
+        z-index: 10;
+        transition: transform 0.25s ease;
+    }
+
+    /* Ẩn sidebar khi đang xem chat */
+    .sidebar.mobile-hidden {
+        transform: translateX(-100%);
+    }
+
+    /* Chat area ẩn mặc định trên mobile */
+    .chat-area {
+        display: none;
+        width: 100%;
+    }
+
+    /* Hiện chat area khi được chọn */
+    .chat-area.mobile-active {
+        display: flex;
+    }
+
+    /* Hiện nút back trên mobile */
+    #btn-back {
+        display: block;
+    }
+
+    /* Tin nhắn rộng hơn trên mobile */
+    .message {
+        max-width: 85%;
+    }
 }
