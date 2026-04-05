@@ -1,7 +1,7 @@
 // src/middleware/rateLimiter.js
 const rateLimit = require('express-rate-limit');
 
-// ── Giới hạn chung cho tất cả API ──
+// Giới hạn chung cho tất cả API
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 phút
     max: 100,
@@ -10,7 +10,7 @@ const apiLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-// ── Giới hạn nghiêm cho đăng nhập (chống brute-force) ──
+// Giới hạn nghiêm cho đăng nhập (chống brute-force)
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 5,
@@ -20,7 +20,7 @@ const authLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-// ── Giới hạn đăng ký (chống spam tài khoản) ──
+// Giới hạn đăng ký (chống spam tài khoản)
 const registerLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 giờ
     max: 5,
@@ -29,7 +29,7 @@ const registerLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-// ── Giới hạn rất nghiêm cho reset password (chống dò recovery key) ──
+// Giới hạn rất nghiêm cho reset password (chống dò recovery key)
 const resetLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 giờ
     max: 3,

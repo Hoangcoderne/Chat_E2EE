@@ -4,7 +4,7 @@ const Group        = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
 const User         = require('../models/User');
 
-// ── Helper ────────────────────────────────────────────────────
+// Helper
 // Lưu ý: sau khi .populate('members.userId'), m.userId là object {_id,...}
 // Trước populate: m.userId là ObjectId → .toString() trả về id string
 // Cần xử lý cả 2 trường hợp
@@ -18,7 +18,7 @@ function isMember(group, userId) {
     });
 }
 
-// ── Lấy public key nhiều user cùng lúc (để client mã hoá group key) ──
+// Lấy public key nhiều user cùng lúc (để client mã hoá group key)
 // GET /api/groups/member-keys?userIds=id1,id2,...
 exports.getMemberKeys = async (req, res) => {
     try {
@@ -34,7 +34,7 @@ exports.getMemberKeys = async (req, res) => {
     }
 };
 
-// ── Tạo nhóm ──────────────────────────────────────────────────
+// Tạo nhóm
 // POST /api/groups/create
 // Body: { name, members: [{ userId, encryptedGroupKey, keyIv }] }
 // members phải bao gồm cả người tạo
@@ -77,7 +77,7 @@ exports.createGroup = async (req, res) => {
     }
 };
 
-// ── Danh sách nhóm của user ────────────────────────────────────
+// Danh sách nhóm của user
 // GET /api/groups
 exports.getGroups = async (req, res) => {
     try {
@@ -117,7 +117,7 @@ exports.getGroups = async (req, res) => {
     }
 };
 
-// ── Lịch sử tin nhắn nhóm ─────────────────────────────────────
+// Lịch sử tin nhắn nhóm
 // GET /api/groups/:groupId/history
 exports.getGroupHistory = async (req, res) => {
     try {
@@ -146,7 +146,7 @@ exports.getGroupHistory = async (req, res) => {
     }
 };
 
-// ── Thêm thành viên (admin only) ──────────────────────────────
+// Thêm thành viên (admin only)
 // POST /api/groups/:groupId/add-member
 // Body: { userId, encryptedGroupKey, keyIv }
 exports.addMember = async (req, res) => {
@@ -181,7 +181,7 @@ exports.addMember = async (req, res) => {
     }
 };
 
-// ── Xoá thành viên (admin only) ───────────────────────────────
+// Xoá thành viên (admin only)
 // POST /api/groups/:groupId/remove-member
 // Body: { userId }
 exports.removeMember = async (req, res) => {
@@ -221,7 +221,7 @@ exports.removeMember = async (req, res) => {
     }
 };
 
-// ── Rời nhóm ─────────────────────────────────────────────────
+// Rời nhóm
 // POST /api/groups/:groupId/leave
 exports.leaveGroup = async (req, res) => {
     try {
@@ -266,7 +266,7 @@ exports.leaveGroup = async (req, res) => {
     }
 };
 
-// ── Lấy group key của user hiện tại ──────────────────────────
+// Lấy group key của user hiện tại
 // GET /api/groups/:groupId/my-key
 exports.getMyGroupKey = async (req, res) => {
     try {
@@ -296,7 +296,7 @@ exports.getMyGroupKey = async (req, res) => {
     }
 };
 
-// ── Lấy thông tin nhóm (danh sách thành viên) ────────────────
+// Lấy thông tin nhóm (danh sách thành viên)
 // GET /api/groups/:groupId/info
 exports.getGroupInfo = async (req, res) => {
     try {
@@ -326,7 +326,7 @@ exports.getGroupInfo = async (req, res) => {
     }
 };
 
-// ── [FIX BUG 5] Toggle reaction cho group message ─────────────
+// Toggle reaction cho group message
 // POST /api/groups/message/reaction
 exports.toggleGroupReaction = async (req, res) => {
     try {
@@ -368,7 +368,7 @@ exports.toggleGroupReaction = async (req, res) => {
     }
 };
 
-// ── Xoá tin nhắn nhóm hoàn toàn (chỉ người gửi) ──────────────
+// Xoá tin nhắn nhóm hoàn toàn (chỉ người gửi)
 // POST /api/groups/message/delete
 exports.deleteGroupMessage = async (req, res) => {
     try {
@@ -397,4 +397,4 @@ exports.deleteGroupMessage = async (req, res) => {
     }
 };
 
-// ── Xoá tin nhắn nhóm (chỉ người gửi) ───────────────────────
+// Xoá tin nhắn nhóm (chỉ người gửi)

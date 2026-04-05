@@ -5,9 +5,7 @@ import {
     arrayBufferToBase64, base64ToArrayBuffer
 } from './crypto/key-manager.js';
 
-// ============================================================
-// 1. CONFIG & STATE MANAGEMENT
-// ============================================================
+// CONFIG & STATE MANAGEMENT
 const socket = io();
 
 let friendRequests = [];
@@ -25,10 +23,10 @@ let currentChat = {
     sharedSecret: null
 };
 
-// [MỚI] Theo dõi số tin chưa đọc theo từng contactId
+// Theo dõi số tin chưa đọc theo từng contactId
 let unreadCounts = {};
 
-// [MỚI] Tin nhắn đang chờ forward sau khi handshake xong
+// Tin nhắn đang chờ forward sau khi handshake xong
 let pendingForward = null;
 
 // ── Group chat state ──
@@ -84,9 +82,7 @@ socket.on('connect', () => {
     }
 });
 
-// ============================================================
-// 2. HELPER FUNCTIONS (AUTH & DB)
-// ============================================================
+// HELPER FUNCTIONS (AUTH & DB)
 
 // authFetch tự động refresh access token khi hết hạn
 async function authFetch(url, options = {}, _isRetry = false) {
@@ -120,7 +116,7 @@ async function authFetch(url, options = {}, _isRetry = false) {
     return res;
 }
 
-// [FIX #5] Refresh token nằm trong HttpOnly Cookie — browser tự gửi kèm
+// Refresh token nằm trong HttpOnly Cookie — browser tự gửi kèm
 // Không cần đọc/gửi refreshToken từ localStorage nữa
 async function tryRefreshToken() {
     try {
@@ -142,7 +138,7 @@ async function tryRefreshToken() {
     }
 }
 
-// [MỚI] Format timestamp hiển thị trên tin nhắn
+// Format timestamp hiển thị trên tin nhắn
 function formatTime(date) {
     const d = new Date(date);
     const now = new Date();
@@ -158,7 +154,7 @@ function formatTime(date) {
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + timeStr;
 }
 
-// [MỚI] Cập nhật badge số tin chưa đọc trên sidebar
+// Cập nhật badge số tin chưa đọc trên sidebar
 function setUnreadBadge(userId, count) {
     unreadCounts[userId] = count;
     const badge = document.getElementById(`unread-${userId}`);
@@ -208,7 +204,7 @@ function loadKeyFromDB(id = 'my-private-key') {
 
 async function logout() {
     try {
-        // [FIX #5] Không cần gửi refreshToken trong body
+        // Không cần gửi refreshToken trong body
         // Server đọc từ HttpOnly cookie và tự xóa cookie đó
         fetch('/api/auth/logout', {
             method: 'POST',
@@ -234,14 +230,12 @@ async function logout() {
 
         sessionStorage.clear();
         localStorage.removeItem('accessToken');
-        // [FIX #5] Không còn refreshToken trong localStorage để xóa
+        // Không còn refreshToken trong localStorage để xóa
         window.location.href = '/login.html';
     }
 }
 
-// ============================================================
 // 3. INITIALIZATION
-// ============================================================
 
 async function initApp() {
     const token = localStorage.getItem('accessToken');
@@ -271,8 +265,6 @@ async function initApp() {
         await loadFriendRequests();
         await loadNotifications();
 
-        console.log("✅ App Initialized. Ready to E2EE.");
-
     } catch (err) {
         console.error(err);
         alert("Lỗi khởi tạo: " + err.message);
@@ -280,9 +272,7 @@ async function initApp() {
     }
 }
 
-// ============================================================
-// 4. SOCKET EVENT LISTENERS (REAL-TIME)
-// ============================================================
+// SOCKET EVENT LISTENERS (REAL-TIME)
 
 // A. Handshake: Nhận Public Key -> Tạo Shared Secret
 socket.on('response_public_key', async (data) => {
@@ -304,7 +294,7 @@ socket.on('response_public_key', async (data) => {
             sharedSecret: sharedKey
         };
 
-        // [FIX BUG 2] Ẩn nút manage group và clear groupId khi chuyển sang DM
+        // Ẩn nút manage group và clear groupId khi chuyển sang DM
         currentGroupId = null;
         dom.btnManageGroup?.classList.add('hidden');
         dom.msgInput.placeholder = 'Nhập tin nhắn';
@@ -322,7 +312,7 @@ socket.on('response_public_key', async (data) => {
 
         await loadChatHistory();
 
-        // [MỚI] Reset badge ngay khi mở chat
+        // Reset badge ngay khi mở chat
         resetUnreadBadge(userId);
 
         // Nếu có tin đang chờ forward → gửi ngay sau khi handshake
@@ -345,7 +335,7 @@ socket.on('response_public_key', async (data) => {
 
 // B. Nhận tin nhắn
 socket.on('receive_message', async (payload) => {
-    // [MỚI] Cập nhật preview sidebar dù chat có đang mở hay không
+    // Cập nhật preview sidebar dù chat có đang mở hay không
     updateContactPreview(payload.senderId);
 
     // Nếu đang chat với người này → hiện tin + mark read ngay
@@ -367,15 +357,15 @@ socket.on('receive_message', async (payload) => {
             socket.emit('mark_read', { partnerId: payload.senderId });
         } catch (err) {
             console.error("Decryption failed:", err);
-            appendMessage("⚠️ [Lỗi giải mã]", 'received', false);
+            appendMessage("[Lỗi giải mã]", 'received', false);
         }
     } else {
-        // [MỚI] Chat khác đang mở → tăng badge
+        // Chat khác đang mở → tăng badge
         incrementUnreadBadge(payload.senderId);
     }
 });
 
-// [MỚI] B2. Đồng bộ tin nhắn đã gửi sang thiết bị khác (cùng tài khoản)
+// B2. Đồng bộ tin nhắn đã gửi sang thiết bị khác (cùng tài khoản)
 socket.on('message_sent_sync', async (payload) => {
     const { senderSocketId, messageId, recipientId, encryptedContent, iv, signature, timestamp } = payload;
 
@@ -404,7 +394,7 @@ socket.on('message_sent_sync', async (payload) => {
 
 // B3. Nhận thông báo tin đã được đọc (DM only)
 socket.on('messages_read', ({ by }) => {
-    // [FIX BUG 5] Chỉ xử lý khi đang ở DM chat, không phải group
+    // Chỉ xử lý khi đang ở DM chat, không phải group
     if (!currentChat.partnerId || currentChat.partnerId !== by) return;
     if (currentGroupId) return; // đang xem group → bỏ qua
     document.querySelectorAll('.msg-wrapper .msg-status').forEach(el => {
@@ -413,7 +403,7 @@ socket.on('messages_read', ({ by }) => {
     });
 });
 
-// C. Trạng thái Online/Offline
+// Trạng thái Online/Offline
 socket.on('user_status_change', (data) => {
     const dot = document.getElementById(`status-${data.userId}`);
     if (dot) {
@@ -422,13 +412,13 @@ socket.on('user_status_change', (data) => {
     updateHeaderStatus(data.userId);
 });
 
-// D. Nhận Lời mời kết bạn
+// Nhận Lời mời kết bạn
 socket.on('receive_friend_request', (data) => {
     friendRequests.push(data);
     updateRequestUI();
 });
 
-// E. Được chấp nhận kết bạn
+// Được chấp nhận kết bạn
 socket.on('request_accepted', (data) => {
     console.log(`${data.accepterName} đã chấp nhận!`);
     if (data.notification) {
@@ -444,7 +434,7 @@ socket.on('request_accepted', (data) => {
     startHandshake(data.accepterName);
 });
 
-// F. Tín hiệu bắt đầu Handshake
+// Tín hiệu bắt đầu Handshake
 socket.on('start_handshake_init', (data) => {
     console.log("Start Handshake Init...");
     renderContactItem({ _id: data.targetId, username: data.targetUsername, online: true });
@@ -456,7 +446,7 @@ socket.on('start_handshake_init', (data) => {
     }
 });
 
-// G. Người khác chặn mình
+// Người khác chặn mình
 socket.on('you_have_been_blocked', ({ blockerId }) => {
     const li = document.querySelector(`.contact-item[data-id="${blockerId}"]`);
     if (li) {
@@ -466,7 +456,7 @@ socket.on('you_have_been_blocked', ({ blockerId }) => {
     }
 });
 
-// H. Người khác bỏ chặn mình
+// Người khác bỏ chặn mình
 socket.on('you_have_been_unblocked', ({ unblockerId }) => {
     const li = document.querySelector(`.contact-item[data-id="${unblockerId}"]`);
     if (li) {
@@ -476,18 +466,18 @@ socket.on('you_have_been_unblocked', ({ unblockerId }) => {
     }
 });
 
-// [FIX #1] Handler system_message
+// Handler system_message
 socket.on('system_message', ({ text }) => {
     appendMessage(text, 'system');
 });
 
-// [MỚI] Tin nhắn bị xoá
+// Tin nhắn bị xoá
 socket.on('message_deleted', ({ messageId }) => {
     const el = document.querySelector(`.msg-wrapper[data-msg-id="${messageId}"]`);
     if (el) el.remove();
 });
 
-// [MỚI] Reaction được cập nhật
+// Reaction được cập nhật
 socket.on('reaction_updated', ({ messageId, reactions }) => {
     const wrapper = document.querySelector(`.msg-wrapper[data-msg-id="${messageId}"]`);
     if (!wrapper) return;
@@ -495,7 +485,7 @@ socket.on('reaction_updated', ({ messageId, reactions }) => {
     if (bar) renderReactions(bar, reactions);
 });
 
-// [FIX #1] Thêm handler cho request_sent_success
+// Thêm handler cho request_sent_success
 socket.on('request_sent_success', (msg) => {
     notifications.unshift({ _id: 'temp_' + Date.now(), content: msg });
     updateRequestUI();
@@ -503,9 +493,7 @@ socket.on('request_sent_success', (msg) => {
 
 socket.on('error', (msg) => alert(msg));
 
-// ============================================================
-// 5. API CALLS (DATA LOADING)
-// ============================================================
+// API CALLS (DATA LOADING)
 
 async function loadContacts() {
     try {
@@ -543,7 +531,7 @@ async function loadChatHistory() {
                     { ciphertext: msg.encryptedContent, iv: msg.iv },
                     sharedSecret
                 );
-                // [FIX] .toString() để tránh lỗi so sánh ObjectId với string
+                // .toString() để tránh lỗi so sánh ObjectId với string
                 const type = (msg.sender.toString() === userId) ? 'sent' : 'received';
 
                 let signatureValid = null;
@@ -572,7 +560,7 @@ async function loadChatHistory() {
         }
         dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
 
-        // [MỚI] Đánh dấu đã đọc + reset badge sau khi load history
+        // Đánh dấu đã đọc + reset badge sau khi load history
         socket.emit('mark_read', { partnerId });
         resetUnreadBadge(partnerId);
     } catch (err) {
@@ -603,11 +591,8 @@ async function loadNotifications() {
     } catch (err) { console.error(err); }
 }
 
-// ============================================================
-// 6. UI RENDERING & INTERACTIONS
-// ============================================================
+// UI RENDERING & INTERACTIONS
 
-// [FIX #3] Vẽ contact item dùng đúng class CSS đã định nghĩa trong main.css
 function renderContactItem(user) {
     if (document.querySelector(`.contact-item[data-id="${user._id}"]`)) return;
 
@@ -625,8 +610,6 @@ function renderContactItem(user) {
     menu.id = `menu-${user._id}`;
     menu.className = 'options-menu hidden';
 
-    // [FIX CSP] Không dùng onclick="..." inline — vi phạm Content Security Policy
-    // Dùng createElement + addEventListener thay thế
     const btnBlock   = document.createElement('button');
     btnBlock.className = 'danger';
     btnBlock.textContent = '🚫 Chặn';
@@ -656,7 +639,7 @@ function renderContactItem(user) {
         <div class="last-message" id="preview-${user._id}">Nhấn để chat</div>
     `;
 
-    // [MỚI] Badge số tin chưa đọc
+    // Badge số tin chưa đọc
     const badge = document.createElement('span');
     badge.className = 'unread-badge hidden';
     badge.id = `unread-${user._id}`;
@@ -666,7 +649,7 @@ function renderContactItem(user) {
         unreadCounts[user._id] = user.unreadCount;
     }
 
-    // [FIX CSP] Nút ⋮ dùng addEventListener thay vì onclick="..."
+    // Nút ⋮ dùng addEventListener thay vì onclick="..."
     const optionsBtn = document.createElement('button');
     optionsBtn.className = 'contact-options-btn';
     optionsBtn.textContent = '⋮';
@@ -1023,7 +1006,7 @@ function closeAllPopups() {
 // ── Xoá tin nhắn ──
 async function doDeleteMessage(msgId, wrapper) {
     try {
-        // [FIX] Đọc groupId từ dataset của wrapper — không dùng currentGroupId
+        // Đọc groupId từ dataset của wrapper — không dùng currentGroupId
         // vì user có thể đã chuyển tab/DM trước khi click Delete
         const groupId = wrapper.dataset.groupId || null;
         const isGroup = !!groupId;
@@ -1063,7 +1046,7 @@ async function doDeleteMessage(msgId, wrapper) {
 // ── Toggle reaction (DM + Group) ──
 async function doToggleReaction(msgId, emoji, wrapper) {
     try {
-        // [FIX BUG 5] Phân biệt group message và DM message
+        // Phân biệt group message và DM message
         const isGroupMsg = !!currentGroupId;
         const endpoint   = isGroupMsg
             ? `/api/groups/message/reaction`
@@ -1329,7 +1312,7 @@ function appendGroupSystemMessage(text) {
     dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
 }
 
-// [MỚI] Cập nhật dòng preview "Tin nhắn mới" ở sidebar
+// Cập nhật dòng preview "Tin nhắn mới" ở sidebar
 function updateContactPreview(userId) {
     const el = document.getElementById(`preview-${userId}`);
     if (el) el.textContent = 'Có tin nhắn mới';
@@ -1347,9 +1330,7 @@ function updateHeaderStatus(userId) {
     }
 }
 
-// ============================================================
-// 7. USER ACTIONS & EVENT HANDLERS
-// ============================================================
+// USER ACTIONS & EVENT HANDLERS
 
 function startHandshake(targetUsername) {
     if (!targetUsername) return;
@@ -1373,7 +1354,7 @@ async function sendMessage() {
         });
 
         clearEmptyState();
-        // [MỚI] isTemp=true: hiện ngay, chờ message_sent_sync gán msgId thật
+        // isTemp=true: hiện ngay, chờ message_sent_sync gán msgId thật
         appendMessage(text, 'sent', null, new Date(), null, true, [], currentGroupId);
         dom.msgInput.value = '';
     } catch (err) {
@@ -1404,7 +1385,7 @@ window.toggleMenu = function(e, btn, id) {
     if (isOpen) return;
 
     // === Định vị menu ===
-    // [FIX] Dùng `btn` được truyền vào thay vì e.currentTarget
+    // Dùng `btn` được truyền vào thay vì e.currentTarget
     // e.currentTarget trong inline onclick không đáng tin cậy (có thể null)
     const btnRect = btn.getBoundingClientRect();
 
@@ -1440,7 +1421,7 @@ window.handleUnfriend = async function(e, targetId) {
         const data = await res.json();
         if (data.success) {
             document.querySelector(`.contact-item[data-id="${targetId}"]`).remove();
-            // [FIX] Xóa menu element khỏi document.body khi unfriend
+            // Xóa menu element khỏi document.body khi unfriend
             const orphanMenu = document.getElementById(`menu-${targetId}`);
             if (orphanMenu) orphanMenu.remove();
             if (currentChat.partnerId === targetId) {
@@ -1547,12 +1528,7 @@ dom.btnConnect.addEventListener('click', () => {
     }
 });
 
-// CHẠY INIT
-initApp();
-
-// ============================================================
 // ══ GROUP CHAT MODULE ══
-// ============================================================
 
 // ── Crypto helpers cho group key ──
 
@@ -1735,7 +1711,7 @@ async function loadGroupHistory(groupId) {
         }
         dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
 
-        // [FIX BUG 1] Emit mark_group_read sau khi load và hiển thị xong
+        // Emit mark_group_read sau khi load và hiển thị xong
         socket.emit('mark_group_read', { groupId });
 
     } catch (err) {
@@ -1802,7 +1778,7 @@ socket.on('receive_group_message', async (payload) => {
             senderLabel.textContent = senderName;
             wrapper.insertBefore(senderLabel, wrapper.firstChild);
         }
-        // [FIX BUG 1] Đang xem nhóm → đánh dấu đã đọc real-time
+        // Đang xem nhóm → đánh dấu đã đọc real-time
         socket.emit('mark_group_read', { groupId });
     } catch (e) {
         appendMessage('[Lỗi giải mã]', 'system');
@@ -1825,7 +1801,7 @@ socket.on('group_message_sent_sync', async (payload) => {
 });
 
 socket.on('group_invited', async ({ groupId, groupName, memberCount }) => {
-    // [FIX BUG 2] Join socket room ngay
+    // Join socket room ngay
     socket.emit('join_groups', [groupId]);
 
     // Fetch đầy đủ thông tin từ /api/groups (getGroups) để có myEncryptedKey + unreadCount
@@ -1847,7 +1823,7 @@ socket.on('group_invited', async ({ groupId, groupName, memberCount }) => {
                 renderGroupItem(newGroup);
             }
 
-            // [FIX BUG 2] Switch sang tab nhóm để user thấy ngay
+            // Switch sang tab nhóm để user thấy ngay
             dom.tabGroups?.click();
 
             // Hiện thông báo nhỏ ở chat area
@@ -1980,7 +1956,7 @@ socket.on('group_kicked', ({ groupId }) => {
 });
 
 socket.on('group_member_added', ({ groupId, memberCount }) => {
-    // [FIX BUG 2] Cập nhật preview sidebar member count
+    // Cập nhật preview sidebar member count
     const previewEl = document.getElementById(`group-preview-${groupId}`);
     if (previewEl && memberCount) previewEl.textContent = `${memberCount} thành viên`;
 
@@ -2155,7 +2131,7 @@ async function submitCreateGroup() {
         // Render group item trong sidebar
         renderGroupItem({ ...group, members: group.members, unreadCount: 0 });
 
-        // [FIX BUG 1] Emit đúng newMemberIds để server gửi group_invited cho từng thành viên
+        // Emit đúng newMemberIds để server gửi group_invited cho từng thành viên
         const newMemberIds = memberPayloads
             .map(m => m.userId.toString())
             .filter(uid => uid !== myIdentity.userId); // bỏ creator (đã xử lý rồi)
@@ -2342,7 +2318,7 @@ async function addSelectedMembers() {
             if (data.success) addedIds.push(m._id.toString());
         }
 
-        // [FIX BUG 2] Emit 1 lần với tất cả IDs thay vì nhiều lần riêng lẻ
+        // Emit 1 lần với tất cả IDs thay vì nhiều lần riêng lẻ
         if (addedIds.length > 0) {
             socket.emit('broadcast_group_member_added', {
                 groupId,
@@ -2386,6 +2362,6 @@ async function removeMemberFromGroup(groupId, userId, username) {
     }
 }
 
-// Load groups khi init xong (gọi trong initApp)
+initApp();
 // Được gọi tự động vì initApp() đã chạy ở trên
 loadGroups();

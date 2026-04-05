@@ -10,10 +10,10 @@ const GroupMessageSchema = new mongoose.Schema({
     groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true },
     sender:  { type: mongoose.Schema.Types.ObjectId, ref: 'User',  required: true },
 
-    // [MỚI] Loại tin nhắn: 'message' (thường) hoặc 'system' (sự kiện nhóm)
+    //  Loại tin nhắn: 'message' (thường) hoặc 'system' (sự kiện nhóm)
     type: { type: String, enum: ['message', 'system'], default: 'message' },
 
-    // [MỚI] Nội dung plain text cho system message (không mã hoá)
+    //  Nội dung plain text cho system message (không mã hoá)
     systemText: { type: String, default: null },
 
     // Nội dung mã hoá bằng group key (AES-GCM) — chỉ dùng khi type='message'

@@ -22,9 +22,7 @@ let state = {
     recoverySigningIv: null,
 };
 
-// ============================================================
 // HELPER: Kiểm tra độ mạnh mật khẩu (đồng bộ với register.js)
-// ============================================================
 function validatePasswordStrength(password) {
     const errors = [];
     if (password.length < 8)
@@ -89,9 +87,7 @@ function goToStep(n) {
     clearMessages();
 }
 
-// ============================================================
 // BƯỚC 1 — Verify Recovery Key
-// ============================================================
 document.getElementById('btn-verify').addEventListener('click', async () => {
     const username    = document.getElementById('username').value.trim();
     const recoveryKey = document.getElementById('recovery-key').value.trim().toUpperCase();
@@ -132,9 +128,7 @@ document.getElementById('btn-verify').addEventListener('click', async () => {
     }
 });
 
-// ============================================================
 // BƯỚC 2 — Đặt mật khẩu mới + Re-encrypt keys
-// ============================================================
 document.getElementById('btn-reset').addEventListener('click', async () => {
     const newPassword     = document.getElementById('new-password').value;
     const confirmPassword = document.getElementById('confirm-password').value;

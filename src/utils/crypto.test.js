@@ -3,7 +3,7 @@ const cryptoUtil = require('./crypto');
 
 describe('Tiện ích Crypto', () => {
 
-    // ── hashToken ──────────────────────────────────
+    // hashToken
     describe('hashToken()', () => {
         test('hash cùng input → cùng output (deterministic)', () => {
             const token = 'my-test-token-123';
@@ -19,7 +19,7 @@ describe('Tiện ích Crypto', () => {
         });
     });
 
-    // ── generateRefreshToken ───────────────────────
+    // generateRefreshToken
     describe('generateRefreshToken()', () => {
         test('tạo chuỗi hex 128 ký tự (64 bytes)', () => {
             const token = cryptoUtil.generateRefreshToken();
@@ -33,7 +33,7 @@ describe('Tiện ích Crypto', () => {
         });
     });
 
-    // ── hashPassword ───────────────────────────────
+    // hashPassword
     describe('hashPassword()', () => {
         test('hash không giống plaintext', async () => {
             const pw = 'MyPassword123!';
@@ -50,7 +50,7 @@ describe('Tiện ích Crypto', () => {
         });
     });
 
-    // ── verifyPassword ─────────────────────────────
+    // verifyPassword
     describe('verifyPassword()', () => {
         test('xác minh đúng password → true', async () => {
             const pw = 'CorrectPassword!';
@@ -69,7 +69,7 @@ describe('Tiện ích Crypto', () => {
         });
     });
 
-    // ── verifyTokenHash ────────────────────────────
+    // verifyTokenHash
     describe('verifyTokenHash()', () => {
         test('token đúng → true', () => {
             const token = 'abc123def456';

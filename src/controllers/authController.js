@@ -5,9 +5,7 @@ const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');                        
 const { hashToken, generateRefreshToken, hashPassword, verifyPassword } = require('../utils/crypto'); 
 
-// ============================================================
 // HELPER: Tạo & lưu Refresh Token, set HttpOnly Cookie
-// ============================================================
 async function issueRefreshToken(res, userId) {
     const refreshTokenPlain = generateRefreshToken();
     const refreshTokenHash  = hashToken(refreshTokenPlain);
@@ -23,9 +21,7 @@ async function issueRefreshToken(res, userId) {
     });
 }
 
-// ============================================================
 // 1. ĐĂNG KÝ
-// ============================================================
 exports.register = async (req, res) => {
     try {
         const {
@@ -81,9 +77,7 @@ exports.register = async (req, res) => {
     }
 };
 
-// ============================================================
 // 2. LẤY SALT
-// ============================================================
 exports.getSalt = async (req, res) => {
     try {
         const { username } = req.query;
@@ -99,9 +93,7 @@ exports.getSalt = async (req, res) => {
     }
 };
 
-// ============================================================
 // 3. ĐĂNG NHẬP
-// ============================================================
 exports.login = async (req, res) => {
     try {
         const { username, authKeyHash } = req.body;
@@ -149,9 +141,7 @@ exports.login = async (req, res) => {
     }
 };
 
-// ============================================================
 // VERIFY RECOVERY KEY (Bước 1)
-// ============================================================
 exports.verifyRecoveryKey = async (req, res) => {
     try {
         const { username, recoveryKey } = req.body;
@@ -178,9 +168,7 @@ exports.verifyRecoveryKey = async (req, res) => {
     }
 };
 
-// ============================================================
 // RESET PASSWORD (Bước 2)
-// ============================================================
 exports.resetPassword = async (req, res) => {
     try {
         const {
@@ -230,9 +218,7 @@ exports.resetPassword = async (req, res) => {
     }
 };
 
-// ============================================================
 // REFRESH TOKEN
-// ============================================================
 exports.refreshToken = async (req, res) => {
     try {
         const refreshToken = req.cookies.refreshToken;
@@ -264,9 +250,7 @@ exports.refreshToken = async (req, res) => {
     }
 };
 
-// ============================================================
 // LOGOUT
-// ============================================================
 exports.logout = async (req, res) => {
     try {
         const refreshToken = req.cookies.refreshToken;

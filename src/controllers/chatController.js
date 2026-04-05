@@ -4,7 +4,7 @@ const Message    = require('../models/Message');
 const User       = require('../models/User');
 const Friendship = require('../models/Friendship');
 
-// ── Lịch sử chat ──────────────────────────────────────────────
+// Lịch sử chat 
 exports.getChatHistory = async (req, res) => {
     try {
         const currentUserId = req.user.userId;
@@ -29,7 +29,7 @@ exports.getChatHistory = async (req, res) => {
     }
 };
 
-// ── Danh sách bạn bè + unread count ───────────────────────────
+// Danh sách bạn bè + unread count 
 exports.getContacts = async (req, res) => {
     try {
         const currentUserId = req.user.userId;
@@ -67,7 +67,7 @@ exports.getContacts = async (req, res) => {
     }
 };
 
-// ── Bỏ chặn ───────────────────────────────────────────────────
+// Bỏ chặn 
 exports.unblockUser = async (req, res) => {
     try {
         const { targetId } = req.body;
@@ -84,7 +84,7 @@ exports.unblockUser = async (req, res) => {
     }
 };
 
-// ── Lời mời kết bạn ───────────────────────────────────────────
+// Lời mời kết bạn 
 exports.getFriendRequests = async (req, res) => {
     try {
         const currentUserId = req.user.userId;
@@ -98,7 +98,7 @@ exports.getFriendRequests = async (req, res) => {
     }
 };
 
-// ── Thông báo ─────────────────────────────────────────────────
+// Thông báo 
 exports.getNotifications = async (req, res) => {
     try {
         const currentUserId = req.user.userId;
@@ -110,7 +110,7 @@ exports.getNotifications = async (req, res) => {
     }
 };
 
-// ── Hủy kết bạn ───────────────────────────────────────────────
+// Hủy kết bạn 
 exports.unfriend = async (req, res) => {
     try {
         const { targetId } = req.body;
@@ -130,7 +130,7 @@ exports.unfriend = async (req, res) => {
     }
 };
 
-// ── Chặn người dùng ───────────────────────────────────────────
+// Chặn người dùng 
 exports.blockUser = async (req, res) => {
     try {
         const { targetId } = req.body;
@@ -150,7 +150,7 @@ exports.blockUser = async (req, res) => {
     }
 };
 
-// ── [MỚI] Xoá tin nhắn hoàn toàn khỏi database ───────────────
+// Xoá tin nhắn hoàn toàn khỏi database 
 exports.deleteMessage = async (req, res) => {
     try {
         const { messageId } = req.body;
@@ -177,7 +177,7 @@ exports.deleteMessage = async (req, res) => {
     }
 };
 
-// ── [MỚI] Toggle cảm xúc ─────────────────────────────────────
+// Toggle cảm xúc 
 // Chưa có → thêm | cùng emoji → xoá (toggle off) | khác emoji → đổi
 exports.toggleReaction = async (req, res) => {
     try {

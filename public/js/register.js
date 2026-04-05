@@ -21,10 +21,8 @@ const successMsg = document.getElementById('success-msg');
 // Không dùng sessionStorage vì chứa dữ liệu nhạy cảm (keys chưa mã hoá)
 let pendingPayload = null;
 
-// ============================================================
 // HELPER: Kiểm tra độ mạnh mật khẩu
 // Yêu cầu: ≥8 ký tự, ít nhất 1 hoa, 1 số, 1 ký tự đặc biệt
-// ============================================================
 function validatePasswordStrength(password) {
     const errors = [];
     if (password.length < 8)
@@ -70,7 +68,6 @@ passwordInput.addEventListener('input', () => {
     }
 });
 
-// ============================================================
 // ── Validate username format client-side ──
 function validateUsernameFormat(username) {
     const errors = [];
@@ -100,9 +97,7 @@ document.getElementById('username')?.addEventListener('input', function () {
     }
 });
 
-// ============================================================
 // PHASE 1 — Form submit: validate + check username + generate keys
-// ============================================================
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -199,10 +194,7 @@ form.addEventListener('submit', async (e) => {
     }
 });
 
-// ============================================================
 // PHASE 2 — Sau khi user xác nhận đã lưu recovery key
-// Lúc này MỚI gọi API để tạo tài khoản
-// ============================================================
 async function doRegister() {
     if (!pendingPayload) {
         showError('Phiên đăng ký đã hết hạn. Vui lòng thử lại.');
@@ -252,9 +244,7 @@ async function doRegister() {
     }
 }
 
-// ============================================================
 // UI: Hiện trang recovery key (Phase 1 → Phase 2)
-// ============================================================
 function showRecoveryStep(recoveryDisplay) {
     // Ẩn form
     form.style.display    = 'none';

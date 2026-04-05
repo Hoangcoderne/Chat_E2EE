@@ -1145,6 +1145,17 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
         padding: 12px;       /* padding nhỏ lại so với desktop 20px */
         box-sizing: border-box;
     }
+    
+    .requests-popup {
+        left: auto;
+        right: 0;
+    }
+
+    .header-info {
+        flex: 1;
+        align-items: center;
+        text-align: center;
+    }
 
     /* Ẩn sidebar khi đang xem chat */
     .sidebar.mobile-hidden {

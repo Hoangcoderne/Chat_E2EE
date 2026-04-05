@@ -30,7 +30,7 @@ const MessageSchema = new mongoose.Schema({
     // Trạng thái đã đọc
     read: { type: Boolean, default: false },
 
-    // [MỚI] Cảm xúc — mảng reaction, mỗi user chỉ 1 slot
+    // Cảm xúc — mảng reaction, mỗi user chỉ 1 slot
     reactions: { type: [ReactionSchema], default: [] },
 
     timestamp: { type: Date, default: Date.now }

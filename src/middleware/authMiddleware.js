@@ -14,7 +14,6 @@ module.exports = (req, res, next) => {
         req.user = decoded;
         next();
     } catch (err) {
-        // [SỬA] Phân biệt 2 loại lỗi:
         // TokenExpiredError → 401 với code 'TOKEN_EXPIRED' → client tự động refresh
         // JsonWebTokenError  → 401 với code 'TOKEN_INVALID' → client logout luôn
         if (err.name === 'TokenExpiredError') {
