@@ -33,6 +33,13 @@ const MessageSchema = new mongoose.Schema({
     // Cảm xúc — mảng reaction, mỗi user chỉ 1 slot
     reactions: { type: [ReactionSchema], default: [] },
 
+    replyTo: {
+        messageId:        { type: mongoose.Schema.Types.ObjectId, default: null },
+        senderName:       { type: String, default: null },
+        encryptedContent: { type: String, default: null },
+        iv:               { type: String, default: null }
+    },
+
     timestamp: { type: Date, default: Date.now }
 });
 

@@ -29,6 +29,9 @@ let unreadCounts = {};
 // Tin nhắn đang chờ forward sau khi handshake xong
 let pendingForward = null;
 
+// trạng thái reply
+let currentReply = null; // { messageId, senderName, plaintext }
+
 // ── Group chat state ──
 let currentGroupId = null;   // groupId đang mở
 // groupKeys: Map<groupId, CryptoKey>  — cache group keys đã giải mã
@@ -152,6 +155,20 @@ function formatTime(date) {
     if (isToday) return timeStr;
     if (isYesterday) return `Hôm qua ${timeStr}`;
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + timeStr;
+}
+
+// Giải mã replyTo từ server thành object { messageId, senderName, plaintext }
+async function decryptReplyTo(replyTo, key) {
+    if (!replyTo?.encryptedContent || !key) return null;
+    try {
+        const plaintext = await decryptMessage(
+            { ciphertext: replyTo.encryptedContent, iv: replyTo.iv },
+            key
+        );
+        return { messageId: replyTo.messageId, senderName: replyTo.senderName, plaintext };
+    } catch (e) {
+        return null;
+    }
 }
 
 // Cập nhật badge số tin chưa đọc trên sidebar
@@ -299,6 +316,7 @@ socket.on('response_public_key', async (data) => {
         dom.btnManageGroup?.classList.add('hidden');
         dom.msgInput.placeholder = 'Nhập tin nhắn';
 
+        cancelReply()
         updateHeaderStatus(userId);
         dom.chatHeader.classList.remove('hidden');
         dom.partnerName.innerText = username || dom.searchInput.value;
@@ -352,7 +370,10 @@ socket.on('receive_message', async (payload) => {
                     decryptedText, payload.signature, currentChat.partnerSigningPublicKey
                 );
             }
-            appendMessage(decryptedText, 'received', signatureValid, payload.timestamp, payload.messageId);
+
+            const replyTo = await decryptReplyTo(payload.replyTo, currentChat.sharedSecret);
+
+            appendMessage(decryptedText, 'received', signatureValid, payload.timestamp, payload.messageId, false, [], null, replyTo);
             // Đang xem chat → đánh dấu đã đọc ngay
             socket.emit('mark_read', { partnerId: payload.senderId });
         } catch (err) {
@@ -367,9 +388,8 @@ socket.on('receive_message', async (payload) => {
 
 // B2. Đồng bộ tin nhắn đã gửi sang thiết bị khác (cùng tài khoản)
 socket.on('message_sent_sync', async (payload) => {
-    const { senderSocketId, messageId, recipientId, encryptedContent, iv, signature, timestamp } = payload;
+    const { senderSocketId, messageId, recipientId, encryptedContent, iv, timestamp, replyTo } = payload;
 
-    // Nếu đây chính là socket đã gửi → chỉ cập nhật msgId cho temp message
     if (senderSocketId === socket.id) {
         const tempEl = dom.messagesList.querySelector('[data-temp="true"]');
         if (tempEl) {
@@ -379,13 +399,12 @@ socket.on('message_sent_sync', async (payload) => {
         return;
     }
 
-    // Thiết bị khác của cùng tài khoản → giải mã và hiển thị nếu đang mở chat đó
     updateContactPreview(recipientId);
-
     if (currentChat.partnerId === recipientId && currentChat.sharedSecret) {
         try {
             const text = await decryptMessage({ ciphertext: encryptedContent, iv }, currentChat.sharedSecret);
-            appendMessage(text, 'sent', null, timestamp, messageId);
+            const replyToDecrypted = await decryptReplyTo(replyTo, currentChat.sharedSecret); 
+            appendMessage(text, 'sent', null, timestamp, messageId, false, [], null, replyToDecrypted);
         } catch (e) {
             appendMessage('[Tin nhắn từ thiết bị khác]', 'system');
         }
@@ -542,8 +561,9 @@ async function loadChatHistory() {
                         currentChat.partnerSigningPublicKey
                     );
                 }
+                const replyTo = await decryptReplyTo(msg.replyTo, sharedSecret);
 
-                appendMessage(decryptedText, type, signatureValid, msg.timestamp, msg._id, false, msg.reactions || []);
+                appendMessage(decryptedText, type, signatureValid, msg.timestamp, msg._id, false, msg.reactions || [], null, replyTo);
 
                 // Nếu là tin mình gửi và đã được đọc → hiện ✓✓ ngay
                 if (type === 'sent' && msg.read) {
@@ -758,7 +778,7 @@ function updateRequestUI() {
 // appendMessage với timestamp, read status, action buttons, reactions
 // isTemp=true: tin vừa gửi, chờ sync từ server để gán msgId thật
 // groupId: truyền vào nếu là tin nhắn nhóm, lưu vào dataset để doDeleteMessage dùng đúng endpoint
-function appendMessage(text, type, signatureValid = null, timestamp = null, msgId = null, isTemp = false, reactions = [], groupId = null) {
+function appendMessage(text, type, signatureValid = null, timestamp = null, msgId = null, isTemp = false, reactions = [], groupId = null, , replyTo = null) {
     const wrapper = document.createElement('div');
     wrapper.className = 'msg-wrapper ' + (type === 'sent' ? 'wrapper-sent' : type === 'system' ? 'wrapper-system' : 'wrapper-received');
 
@@ -780,7 +800,41 @@ function appendMessage(text, type, signatureValid = null, timestamp = null, msgI
             </div>`;
     } else {
         div.classList.add('message', type === 'sent' ? 'msg-sent' : type === 'system' ? 'system-msg' : 'msg-received');
-        div.innerText = text;
+        // Hiển thị quote nếu là tin reply và không phải system message
+        if (replyTo?.plaintext && type !== 'system') {
+            const quote = document.createElement('div');
+            quote.className = 'reply-quote';
+
+            const quoteName = document.createElement('div');
+            quoteName.className = 'reply-quote-name';
+            quoteName.textContent = replyTo.senderName || '';
+
+            const quoteText = document.createElement('div');
+            quoteText.className = 'reply-quote-text';
+            quoteText.textContent = replyTo.plaintext.length > 80
+                ? replyTo.plaintext.slice(0, 80) + '…'
+                : replyTo.plaintext;
+
+            quote.appendChild(quoteName);
+            quote.appendChild(quoteText);
+
+            // Click vào quote → scroll đến tin gốc
+            if (replyTo.messageId) {
+                quote.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const target = dom.messagesList.querySelector(`[data-msg-id="${replyTo.messageId}"]`);
+                    if (target) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        target.classList.add('msg-highlight');
+                        setTimeout(() => target.classList.remove('msg-highlight'), 1500);
+                    }
+                });
+            }
+
+            div.appendChild(quote);
+        }
+
+        div.appendChild(document.createTextNode(text));
     }
 
     // ── Action buttons (hover) — chỉ cho tin thường, không phải system ──
@@ -960,6 +1014,14 @@ function showMsgMenu(e, wrapper, type) {
     const menu = document.createElement('div');
     menu.className = 'msg-options-menu';
     menu.id = '_msg_options_menu';
+
+    const replyBtn = document.createElement('button');
+    replyBtn.textContent = '↩ Trả lời';
+    replyBtn.addEventListener('click', () => {
+        menu.remove(); activeMsgMenu = null;
+        setReply(wrapper);
+    });
+    menu.appendChild(replyBtn);
 
     // Chuyển tiếp (cả 2 phía)
     const fwdBtn = document.createElement('button');
@@ -1302,6 +1364,60 @@ function clearEmptyState() {
     dom.messagesList.querySelectorAll('.empty-state-msg').forEach(el => el.remove());
 }
 
+// đặt tin nhắn đang reply
+function setReply(wrapper) {
+    const plaintext = wrapper.dataset.plaintext;
+    const msgId     = wrapper.dataset.msgId;
+    if (!plaintext) return;
+
+    // Xác định tên người gửi tin gốc
+    let senderName;
+    const senderLabel = wrapper.querySelector('.group-sender-label');
+    if (senderLabel) {
+        senderName = senderLabel.textContent;
+    } else if (wrapper.classList.contains('wrapper-sent')) {
+        senderName = myIdentity.username;
+    } else {
+        senderName = dom.partnerName.innerText.replace('👥 ', '');
+    }
+
+    currentReply = { messageId: msgId, senderName, plaintext };
+    showReplyBar();
+    dom.msgInput.focus();
+}
+
+function showReplyBar() {
+    const bar = document.getElementById('reply-bar');
+    if (!bar) return;
+
+    const name    = currentReply.senderName || '';
+    const preview = currentReply.plaintext.length > 80
+        ? currentReply.plaintext.slice(0, 80) + '…'
+        : currentReply.plaintext;
+
+    bar.innerHTML = `
+        <div class="reply-bar-content">
+            <div class="reply-bar-line"></div>
+            <div class="reply-bar-text">
+                <span class="reply-bar-name"></span>
+                <span class="reply-bar-preview"></span>
+            </div>
+        </div>
+        <button class="reply-bar-close" title="Huỷ reply">✕</button>
+    `;
+    // Dùng textContent để tránh XSS
+    bar.querySelector('.reply-bar-name').textContent    = name;
+    bar.querySelector('.reply-bar-preview').textContent = preview;
+    bar.querySelector('.reply-bar-close').addEventListener('click', cancelReply);
+    bar.classList.remove('hidden');
+}
+
+function cancelReply() {
+    currentReply = null;
+    const bar = document.getElementById('reply-bar');
+    if (bar) bar.classList.add('hidden');
+}
+
 // ── System message full-width trong group chat ──
 function appendGroupSystemMessage(text) {
     clearEmptyState();
@@ -1346,16 +1462,30 @@ async function sendMessage() {
         const signature = await signMessage(text, myIdentity.signingPrivateKey);
         const encryptedData = await encryptMessage(text, currentChat.sharedSecret);
 
+        let replyToPayload = null;
+        if (currentReply) {
+            const encReply = await encryptMessage(currentReply.plaintext, currentChat.sharedSecret);
+            replyToPayload = {
+                messageId:        currentReply.messageId,
+                senderName:       currentReply.senderName,
+                encryptedContent: encReply.ciphertext,
+                iv:               encReply.iv
+            };
+        }
+
         socket.emit('send_message', {
             recipientId: currentChat.partnerId,
             encryptedContent: encryptedData.ciphertext,
             iv: encryptedData.iv,
-            signature
+            signature,
+            replyTo:          replyToPayload
         });
 
         clearEmptyState();
+        const replySnapshot = currentReply ? { ...currentReply } : null;
+        cancelReply();
         // isTemp=true: hiện ngay, chờ message_sent_sync gán msgId thật
-        appendMessage(text, 'sent', null, new Date(), null, true, [], currentGroupId);
+        appendMessage(text, 'sent', null, new Date(), null, true, [], currentGroupId, replySnapshot);
         dom.msgInput.value = '';
     } catch (err) {
         console.error("Lỗi gửi tin:", err);
@@ -1621,6 +1751,7 @@ function renderGroupItem(group) {
 
 // ── Mở group chat ──
 async function openGroupChat(group) {
+    cancelReply(); 
     currentGroupId = group._id;
     currentChat = { partnerId: null, partnerPublicKey: null, partnerSigningPublicKey: null, sharedSecret: null };
 
@@ -1687,7 +1818,7 @@ async function loadGroupHistory(groupId) {
 
         for (const msg of messages) {
             try {
-                // [BUG 3] System message từ DB — hiện full-width, không giải mã
+                // System message từ DB — hiện full-width, không giải mã
                 if (msg.type === 'system' && msg.systemText) {
                     appendGroupSystemMessage(msg.systemText);
                     continue;
@@ -1695,7 +1826,8 @@ async function loadGroupHistory(groupId) {
                 const text = await decryptMessage({ ciphertext: msg.encryptedContent, iv: msg.iv }, groupKey);
                 const isMine = msg.sender._id === myIdentity.userId || msg.sender._id?.toString() === myIdentity.userId;
                 const type   = isMine ? 'sent' : 'received';
-                const wrapper = appendMessage(text, type, null, msg.timestamp, msg._id, false, msg.reactions || [], groupId);
+                const replyToDecrypted = await decryptReplyTo(msg.replyTo, groupKey);
+                const wrapper = appendMessage(text, type, null, msg.timestamp, msg._id, false, msg.reactions || [], groupId, replyToDecrypted);
                 if (!isMine && wrapper) {
                     const senderLabel = document.createElement('div');
                     senderLabel.className = 'group-sender-label';
@@ -1731,15 +1863,29 @@ async function sendGroupMessage() {
         const signature   = await signMessage(text, myIdentity.signingPrivateKey);
         const encrypted   = await encryptMessage(text, groupKey);
 
+        let replyToPayload = null;
+        if (currentReply) {
+            const encReply = await encryptMessage(currentReply.plaintext, groupKey);
+            replyToPayload = {
+                messageId:        currentReply.messageId,
+                senderName:       currentReply.senderName,
+                encryptedContent: encReply.ciphertext,
+                iv:               encReply.iv
+            };
+        }        
+
         socket.emit('send_group_message', {
             groupId:          currentGroupId,
             encryptedContent: encrypted.ciphertext,
             iv:               encrypted.iv,
-            signature
+            signature,
+            replyTo:          replyToPayload
         });
 
         clearEmptyState();
-        appendMessage(text, 'sent', null, new Date(), null, true, [], currentGroupId);
+        const replySnapshot = currentReply ? { ...currentReply } : null;
+        cancelReply();
+        appendMessage(text, 'sent', null, new Date(), null, true, [], currentGroupId, replySnapshot);
         dom.msgInput.value = '';
     } catch (err) {
         console.error('sendGroupMessage error:', err);
@@ -1749,7 +1895,7 @@ async function sendGroupMessage() {
 
 // ── Socket events cho group ──
 socket.on('receive_group_message', async (payload) => {
-    const { groupId, senderId, senderName, encryptedContent, iv, reactions, timestamp, messageId } = payload;
+    const { groupId, senderId, senderName, encryptedContent, iv, reactions, timestamp, messageId, replyTo } = payload;
 
     // Cập nhật preview sidebar
     const previewEl = document.getElementById(`group-preview-${groupId}`);
@@ -1771,7 +1917,8 @@ socket.on('receive_group_message', async (payload) => {
         clearEmptyState();
         const groupKey = await getGroupKey(groupId);
         const text     = await decryptMessage({ ciphertext: encryptedContent, iv }, groupKey);
-        const wrapper  = appendMessage(text, 'received', null, timestamp, messageId, false, reactions || [], groupId);
+        const replyToDecrypted = await decryptReplyTo(replyTo, groupKey);
+        const wrapper  = appendMessage(text, 'received', null, timestamp, messageId, false, reactions || [], groupId, replyToDecrypted);
         if (wrapper) {
             const senderLabel = document.createElement('div');
             senderLabel.className = 'group-sender-label';
@@ -1979,7 +2126,7 @@ socket.on('group_member_removed', ({ groupId, removedUserId, removedName, leavin
     });
 
     if (currentGroupId === groupId && removedUserId !== myIdentity.userId) {
-        // [BUG 3] Phân biệt bị xoá vs tự rời — dùng tên thật từ server
+        // Phân biệt bị xoá vs tự rời — dùng tên thật từ server
         const systemText = leavingName
             ? `${leavingName} đã rời khỏi nhóm`
             : `${removedName || 'Thành viên'} đã bị xóa khỏi nhóm`;

@@ -163,7 +163,7 @@ io.on('connection', (socket) => {
     });
 
     // 3. Chuyển tiếp tin nhắn E2EE
-    socket.on('send_message', async ({ recipientId, encryptedContent, iv, signature }) => {
+    socket.on('send_message', async ({ recipientId, encryptedContent, iv, signature, replyTo }) => {
         try {
             if (!socket.userId)
                 return socket.emit('error', 'Phiên kết nối bị gián đoạn. Vui lòng nhấn F5.');
@@ -197,7 +197,8 @@ io.on('connection', (socket) => {
                 recipient: recipientId,
                 encryptedContent,
                 iv,
-                signature: signature || null
+                signature: signature || null,
+                replyTo:   replyTo || null
             });
             await newMessage.save();
 
@@ -208,6 +209,7 @@ io.on('connection', (socket) => {
                 encryptedContent,
                 iv,
                 signature: signature || null,
+                replyTo: newMessage.replyTo || null,
                 timestamp: newMessage.timestamp
             });
 
@@ -219,6 +221,7 @@ io.on('connection', (socket) => {
                 encryptedContent,
                 iv,
                 signature: signature || null,
+                replyTo: newMessage.replyTo || null,
                 timestamp: newMessage.timestamp
             });
         } catch (err) {
@@ -274,7 +277,7 @@ io.on('connection', (socket) => {
     });
 
     // 3f. Gửi tin nhắn nhóm E2EE
-    socket.on('send_group_message', async ({ groupId, encryptedContent, iv, signature }) => {
+    socket.on('send_group_message', async ({ groupId, encryptedContent, iv, signature, replyTo }) => {
         try {
             if (!socket.userId)
                 return socket.emit('error', 'Phiên kết nối bị gián đoạn.');
@@ -290,7 +293,8 @@ io.on('connection', (socket) => {
                 encryptedContent,
                 iv,
                 signature: signature || null,
-                readBy: [socket.userId]  // sender đã đọc
+                readBy: [socket.userId],  // sender đã đọc
+                replyTo:   replyTo || null
             });
 
             const payload = {
@@ -301,7 +305,8 @@ io.on('connection', (socket) => {
                 encryptedContent,
                 iv,
                 signature:        signature || null,
-                timestamp:        msg.timestamp
+                timestamp:        msg.timestamp,
+                replyTo:          msg.replyTo || null,
             };
 
             // Broadcast tới toàn bộ nhóm (trừ sender)

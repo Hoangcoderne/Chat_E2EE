@@ -26,8 +26,9 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
     gap: 2px;
 }
 .messages-list { flex: 1; padding: 20px; overflow-y: auto; background: #fafafa; display: flex; flex-direction: column; gap: 10px; }
-.chat-input-area { padding: 20px; border-top: 1px solid #ddd; display: flex; gap: 10px; }
-.chat-input-area input { flex: 1; padding: 10px; font-size: 16px; }
+.chat-input-area { padding: 12px 20px 20px; border-top: 1px solid #ddd; display: flex; flex-direction: column; gap: 8px; }
+.input-row { display: flex; gap: 10px; }
+.input-row input { flex: 1; padding: 10px; font-size: 16px; }
 
 /* Message Bubble */
 .message { max-width: 100%; padding: 10px 15px; border-radius: 20px; font-size: 14px; line-height: 1.4; word-break: break-word; overflow-wrap: anywhere; }
@@ -1202,4 +1203,118 @@ body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; }
         padding: 6px;
         font-size: 14px;
     }
+}
+
+/* Reply bar (thanh hiển thị khi đang reply) */
+.reply-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: #f0f4ff;
+    border-left: 3px solid #0084ff;
+    border-radius: 6px;
+    animation: replySlideDown .15s ease;
+}
+@keyframes replySlideDown {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.reply-bar-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+.reply-bar-line {
+    width: 3px;
+    min-height: 32px;
+    background: #0084ff;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.reply-bar-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.reply-bar-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: #0084ff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.reply-bar-preview {
+    font-size: 12px;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.reply-bar-close {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #999;
+    cursor: pointer;
+    padding: 2px 5px;
+    flex-shrink: 0;
+    line-height: 1;
+    border-radius: 50%;
+    transition: background .12s;
+}
+.reply-bar-close:hover { background: #dde; color: #333; }
+
+/* Reply quote bên trong bubble */
+.reply-quote {
+    border-radius: 4px;
+    padding: 5px 8px;
+    margin-bottom: 6px;
+    max-width: 100%;
+    overflow: hidden;
+    transition: opacity .12s;
+}
+.reply-quote:hover { opacity: .85; }
+
+.msg-sent .reply-quote {
+    background: rgba(0,0,0,0.18);
+    border-left: 3px solid rgba(255,255,255,0.6);
+    cursor: pointer;
+}
+.msg-received .reply-quote {
+    background: rgba(0,0,0,0.07);
+    border-left: 3px solid #0084ff;
+    cursor: pointer;
+}
+.reply-quote-name {
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.msg-sent .reply-quote-name     { color: rgba(255,255,255,0.9); }
+.msg-received .reply-quote-name { color: #0084ff; }
+
+.reply-quote-text {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.msg-sent .reply-quote-text     { color: rgba(255,255,255,0.75); }
+.msg-received .reply-quote-text { color: #555; }
+
+/* Highlight khi scroll đến tin gốc */
+@keyframes msgHighlight {
+    0%, 100% { background: transparent; }
+    25%, 75% { background: rgba(0, 132, 255, 0.1); }
+}
+.msg-highlight {
+    animation: msgHighlight 1.5s ease;
+    border-radius: 12px;
 }
