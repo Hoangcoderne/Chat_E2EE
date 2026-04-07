@@ -74,6 +74,26 @@ const dom = {
     chatArea: document.querySelector('.chat-area')
 };
 
+// Mobile navigation — dùng History API để bắt nút back trình duyệt
+function pushMobileChatState() {
+    if (window.innerWidth <= 768) {
+        history.pushState({ chatOpen: true }, '');
+    }
+}
+
+function goBackToSidebar() {
+    dom.chatArea.classList.remove('mobile-active');
+    document.querySelector('.sidebar').classList.remove('mobile-hidden');
+    dom.btnBack.classList.add('hidden');
+}
+
+// Bắt nút back trình duyệt trên mobile
+window.addEventListener('popstate', (e) => {
+    if (window.innerWidth > 768) return;
+    // Nếu state không có chatOpen → đang ở sidebar rồi, không cần làm gì
+    goBackToSidebar();
+});
+
 socket.on('connect', () => {
     const userId = sessionStorage.getItem('userId');
     if (userId) {
@@ -332,6 +352,7 @@ socket.on('response_public_key', async (data) => {
 
         // Reset badge ngay khi mở chat
         resetUnreadBadge(userId);
+        clearContactPreview(userId);
 
         // Nếu có tin đang chờ forward → gửi ngay sau khi handshake
         if (pendingForward && pendingForward.targetId === userId) {
@@ -583,6 +604,7 @@ async function loadChatHistory() {
         // Đánh dấu đã đọc + reset badge sau khi load history
         socket.emit('mark_read', { partnerId });
         resetUnreadBadge(partnerId);
+        clearContactPreview(partnerId);
     } catch (err) {
         console.error("Lỗi tải history:", err);
     }
@@ -720,6 +742,7 @@ function renderContactItem(user) {
             dom.chatArea.classList.add('mobile-active');
             document.querySelector('.sidebar').classList.add('mobile-hidden');
             dom.btnBack.classList.remove('hidden');
+            pushMobileChatState();
         }
     });
 
@@ -1428,6 +1451,17 @@ function appendGroupSystemMessage(text) {
     dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
 }
 
+// Xoá preview text khi đã đọc
+function clearContactPreview(userId) {
+    const el = document.getElementById(`preview-${userId}`);
+    if (el) el.textContent = '';
+}
+
+function clearGroupPreview(groupId) {
+    const el = document.getElementById(`group-preview-${groupId}`);
+    if (el) el.textContent = '';  // hoặc set lại số thành viên nếu muốn
+}
+
 // Cập nhật dòng preview "Tin nhắn mới" ở sidebar
 function updateContactPreview(userId) {
     const el = document.getElementById(`preview-${userId}`);
@@ -1620,9 +1654,8 @@ dom.msgInput.addEventListener('keypress', (e) => {
 });
 
 dom.btnBack.addEventListener('click', () => {
-    dom.chatArea.classList.remove('mobile-active');
-    document.querySelector('.sidebar').classList.remove('mobile-hidden');
-    dom.btnBack.classList.add('hidden');
+    goBackToSidebar();
+    history.back(); // đồng bộ history stack
 });
 
 document.addEventListener('click', (e) => {
@@ -1793,10 +1826,13 @@ async function openGroupChat(group) {
     // Reset badge
     const badge = document.getElementById(`unread-group-${group._id}`);
     if (badge) { badge.textContent = ''; badge.classList.add('hidden'); }
+    clearGroupPreview(group._id);
+
     if (window.innerWidth <= 768) {
         dom.chatArea.classList.add('mobile-active');
         document.querySelector('.sidebar').classList.add('mobile-hidden');
         dom.btnBack.classList.remove('hidden');
+        pushMobileChatState();
     }
 }
 
@@ -2102,16 +2138,19 @@ socket.on('group_kicked', ({ groupId }) => {
     }
 });
 
-socket.on('group_member_added', ({ groupId, memberCount }) => {
-    // Cập nhật preview sidebar member count
+socket.on('group_member_added', ({ groupId, memberCount, newMemberNames }) => {
     const previewEl = document.getElementById(`group-preview-${groupId}`);
     if (previewEl && memberCount) previewEl.textContent = `${memberCount} thành viên`;
 
     if (currentGroupId === groupId) {
-        appendMessage('Có thành viên mới tham gia nhóm', 'system');
-        // Cập nhật header status
+        if (newMemberNames && newMemberNames.length > 0) {
+            newMemberNames.forEach(name => {
+                appendGroupSystemMessage(`${name} đã tham gia nhóm`);
+            });
+        } else {
+            appendGroupSystemMessage('Có thành viên mới tham gia nhóm');
+        }
         if (memberCount) dom.partnerStatus.innerText = `${memberCount} thành viên`;
-        // Reload manage modal nếu đang mở
         if (!dom.modalManageGroup.classList.contains('hidden')) loadManageModal(groupId);
     }
 });

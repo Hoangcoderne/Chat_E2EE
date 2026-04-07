@@ -334,12 +334,17 @@ io.on('connection', (socket) => {
 
             const memberCount = group.members.length;
 
-            // Notify toàn nhóm cũ
+            const newMembers = group.members.filter(m =>
+                newMemberIds.includes((m.userId?._id || m.userId).toString())
+            );
+            const newMemberNames = newMembers.map(m => m.userId?.username || '').filter(Boolean);
+
             socket.to('group:' + groupId).emit('group_member_added', {
                 groupId,
-                memberCount
+                memberCount,
+                newMemberNames 
             });
-
+            
             // Với mỗi member mới: emit group_invited kèm đủ info để render sidebar
             if (Array.isArray(newMemberIds)) {
                 newMemberIds.forEach(uid => {
