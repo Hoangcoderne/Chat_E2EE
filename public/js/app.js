@@ -778,7 +778,7 @@ function updateRequestUI() {
 // appendMessage với timestamp, read status, action buttons, reactions
 // isTemp=true: tin vừa gửi, chờ sync từ server để gán msgId thật
 // groupId: truyền vào nếu là tin nhắn nhóm, lưu vào dataset để doDeleteMessage dùng đúng endpoint
-function appendMessage(text, type, signatureValid = null, timestamp = null, msgId = null, isTemp = false, reactions = [], groupId = null, , replyTo = null) {
+function appendMessage(text, type, signatureValid = null, timestamp = null, msgId = null, isTemp = false, reactions = [], groupId = null, replyTo = null) {
     const wrapper = document.createElement('div');
     wrapper.className = 'msg-wrapper ' + (type === 'sent' ? 'wrapper-sent' : type === 'system' ? 'wrapper-system' : 'wrapper-received');
 
