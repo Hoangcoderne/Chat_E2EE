@@ -2139,18 +2139,22 @@ socket.on('group_kicked', ({ groupId }) => {
 });
 
 socket.on('group_member_added', ({ groupId, memberCount, newMemberNames }) => {
+    // Cập nhật preview sidebar ngay lập tức dù đang ở đâu
     const previewEl = document.getElementById(`group-preview-${groupId}`);
     if (previewEl && memberCount) previewEl.textContent = `${memberCount} thành viên`;
 
     if (currentGroupId === groupId) {
+        // Cập nhật số thành viên trên header ngay lập tức
+        if (memberCount) dom.partnerStatus.innerText = `${memberCount} thành viên`;
+
+        // Hiện system message persistent 
         if (newMemberNames && newMemberNames.length > 0) {
-            newMemberNames.forEach(name => {
-                appendGroupSystemMessage(`${name} đã tham gia nhóm`);
-            });
+            newMemberNames.forEach(name => appendGroupSystemMessage(`${name} đã tham gia nhóm`));
         } else {
             appendGroupSystemMessage('Có thành viên mới tham gia nhóm');
         }
-        if (memberCount) dom.partnerStatus.innerText = `${memberCount} thành viên`;
+
+        // Reload modal nếu đang mở
         if (!dom.modalManageGroup.classList.contains('hidden')) loadManageModal(groupId);
     }
 });

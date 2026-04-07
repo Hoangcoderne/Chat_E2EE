@@ -339,11 +339,22 @@ io.on('connection', (socket) => {
             );
             const newMemberNames = newMembers.map(m => m.userId?.username || '').filter(Boolean);
 
-            socket.to('group:' + groupId).emit('group_member_added', {
+            io.to('group:' + groupId).emit('group_member_added', {
                 groupId,
                 memberCount,
                 newMemberNames 
             });
+
+            for (const name of newMemberNames) {
+                await GroupMessage.create({
+                    groupId,
+                    sender:           socket.userId,
+                    type:             'system',
+                    systemText:       `${name} đã tham gia nhóm`,
+                    encryptedContent: 'system',
+                    iv:               'system'
+                });
+            }
             
             // Với mỗi member mới: emit group_invited kèm đủ info để render sidebar
             if (Array.isArray(newMemberIds)) {
