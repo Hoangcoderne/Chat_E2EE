@@ -13,7 +13,7 @@
 
 | Save Recovery Key | Forgot Password |
 |:---:|:---:|
-|![Register Page](image/Save_RecoveryKey.png)|![Register Page](image/Forgot_Pass.png)|
+|![Register Page](image/Save_recoveryKey.png)|![Register Page](image/Forgot_Pass.png)|
 
 | Home Page |
 |:---:|
