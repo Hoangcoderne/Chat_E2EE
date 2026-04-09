@@ -1,16 +1,25 @@
 {
   "name": "chat_e2ee",
   "version": "1.0.0",
-  "main": "index.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "jest"
+    "test": "jest --runInBand --forceExit",
+    "test:unit": "jest --runInBand --forceExit --testPathPattern=unit",
+    "test:integration": "jest --runInBand --forceExit --testPathPattern=integration",
+    "test:api": "jest --runInBand --forceExit --testPathPattern=api",
+    "test:coverage": "jest --runInBand --forceExit --coverage"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "jest": {
+    "testEnvironment": "node",
+    "testTimeout": 30000,
+    "testMatch": ["**/src/__tests__/**/*.test.js"],
+    "collectCoverageFrom": [
+      "src/controllers/**/*.js",
+      "src/middleware/**/*.js",
+      "src/utils/**/*.js"
+    ]
+  },
   "dependencies": {
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
@@ -31,8 +40,8 @@
   },
   "devDependencies": {
     "jest": "^30.3.0",
-    "mongodb-memory-server": "^11.0.1",
+    "mongodb-memory-server": "^10.1.4",
     "nodemon": "^3.1.11",
-    "supertest": "^7.2.2"
+    "supertest": "^7.0.0"
   }
 }
