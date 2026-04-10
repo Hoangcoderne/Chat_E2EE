@@ -87,7 +87,13 @@ describe('POST /api/groups/create', () => {
     const res = await request(app)
       .post('/api/groups/create')
       .set('Authorization', `Bearer ${makeToken()}`)
-      .send({ name: 'NewGroup', members: [] });
+      .send({
+        name: 'NewGroup',
+        members: [
+          { userId: '507f1f77bcf86cd799439011', encryptedGroupKey: 'enc=', keyIv: 'iv=' },
+          { userId: '507f1f77bcf86cd799439022', encryptedGroupKey: 'enc=', keyIv: 'iv=' },
+        ]
+      });
     expect(res.status).toBe(201);
     expect(groupController.createGroup).toHaveBeenCalledTimes(1);
   });
@@ -136,9 +142,9 @@ describe('GET /api/groups/:groupId/my-key', () => {
 describe('POST /api/groups/:groupId/add-member', () => {
   test('token hợp lệ → controller được gọi', async () => {
     const res = await request(app)
-      .post('/api/groups/gid1/add-member')
+      .post('/api/groups/507f1f77bcf86cd799439011/add-member')
       .set('Authorization', `Bearer ${makeToken()}`)
-      .send({ userId: 'uid2', encryptedGroupKey: 'enc=', keyIv: 'iv=' });
+      .send({ userId: '507f1f77bcf86cd799439022', encryptedGroupKey: 'enc=', keyIv: 'iv=' });
     expect(res.status).toBe(200);
     expect(groupController.addMember).toHaveBeenCalledTimes(1);
   });
@@ -152,9 +158,9 @@ describe('POST /api/groups/:groupId/add-member', () => {
 describe('POST /api/groups/:groupId/remove-member', () => {
   test('token hợp lệ → controller được gọi', async () => {
     const res = await request(app)
-      .post('/api/groups/gid1/remove-member')
+      .post('/api/groups/507f1f77bcf86cd799439011/remove-member')
       .set('Authorization', `Bearer ${makeToken()}`)
-      .send({ userId: 'uid2' });
+      .send({ userId: '507f1f77bcf86cd799439022' });
     expect(res.status).toBe(200);
     expect(groupController.removeMember).toHaveBeenCalledTimes(1);
   });

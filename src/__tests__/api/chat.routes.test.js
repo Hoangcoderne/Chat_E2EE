@@ -94,18 +94,20 @@ describe('authMiddleware trên chat routes', () => {
 describe('GET /api/chat/history/:partnerId', () => {
   test('token hợp lệ + partnerId → controller được gọi với đúng params', async () => {
     const token = makeToken();
+    const partnerId = '507f1f77bcf86cd799439011';
     await request(app)
-      .get('/api/chat/history/partner123')
+      .get(`/api/chat/history/${partnerId}`)
       .set('Authorization', `Bearer ${token}`);
     expect(chatController.getChatHistory).toHaveBeenCalledTimes(1);
     const reqArg = chatController.getChatHistory.mock.calls[0][0];
-    expect(reqArg.params.partnerId).toBe('partner123');
+    expect(reqArg.params.partnerId).toBe(partnerId);
   });
 
   test('userId đến từ JWT, không phải URL — bảo vệ IDOR', async () => {
     const token = makeToken('uid_alice_real');
+    const partnerId = '507f1f77bcf86cd799439022';
     await request(app)
-      .get('/api/chat/history/partner456')
+      .get(`/api/chat/history/${partnerId}`)
       .set('Authorization', `Bearer ${token}`);
     const reqArg = chatController.getChatHistory.mock.calls[0][0];
     // userId phải từ JWT, không phải tự inject
@@ -113,7 +115,7 @@ describe('GET /api/chat/history/:partnerId', () => {
   });
 
   test('không có token → 401', async () => {
-    const res = await request(app).get('/api/chat/history/partner123');
+    const res = await request(app).get('/api/chat/history/507f1f77bcf86cd799439011');
     expect(res.status).toBe(401);
     expect(chatController.getChatHistory).not.toHaveBeenCalled();
   });

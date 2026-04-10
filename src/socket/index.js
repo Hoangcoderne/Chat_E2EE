@@ -15,6 +15,29 @@ const groupHandler     = require('./groupHandler');
  * @param {import('socket.io').Server} io
  */
 function registerSocketHandlers(io) {
+    // Connection rate limiting — chống reconnect spam / DDoS
+    const connectionAttempts = new Map(); // Map<ip, { count, resetTime }>
+    const MAX_CONNECTIONS_PER_WINDOW = 10;
+    const WINDOW_MS = 30000; // 30 giây
+
+    io.use((socket, next) => {
+        const ip = socket.handshake.address;
+        const now = Date.now();
+        let entry = connectionAttempts.get(ip);
+
+        if (!entry || now > entry.resetTime) {
+            entry = { count: 0, resetTime: now + WINDOW_MS };
+            connectionAttempts.set(ip, entry);
+        }
+
+        entry.count++;
+        if (entry.count > MAX_CONNECTIONS_PER_WINDOW) {
+            logger.warn({ event: 'socket_rate_limited', ip, count: entry.count });
+            return next(new Error('Too many connection attempts. Try again later.'));
+        }
+        next();
+    });
+
     // JWT authentication middleware — chặn kết nối không có token hợp lệ
     io.use((socket, next) => {
         const token = socket.handshake.auth?.token;

@@ -1,0 +1,329 @@
+/* public/styles/sidebar.css */
+/* Sidebar: profile, search, contacts, tabs, notifications, options menu */
+
+.sidebar { width: 300px; background: #f7f7f7; border-right: 1px solid #ddd; padding: 20px; display: flex; flex-direction: column; }
+.search-box { display: flex; gap: 5px; margin-bottom: 20px; }
+.search-box input { flex: 1; padding: 8px; }
+
+.contacts-area { flex: 1; overflow-y: auto; margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px; }
+.contacts-list { list-style: none; padding: 0; margin: 0; }
+
+/* ── Contact Item ── */
+.contact-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background 0.2s;
+}
+.contact-item:hover { background-color: #e0e0e0; }
+.contact-item.active { background-color: #d1e7dd; }
+
+/* Avatar container */
+.avatar-container {
+    position: relative;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.avatar {
+    width: 38px;
+    height: 38px;
+    background: #0084ff;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 1em;
+}
+
+/* Chấm trạng thái góc dưới-phải avatar */
+.avatar-container .status-dot {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background-color: #ccc;
+    border: 2px solid #f7f7f7;
+}
+.avatar-container .status-dot.online {
+    background-color: #28a745;
+    box-shadow: 0 0 3px #28a745;
+}
+
+/* Thông tin liên hệ */
+.contact-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.contact-name {
+    font-weight: 500;
+    font-size: 0.95em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Dòng preview tin nhắn cuối */
+.last-message {
+    font-size: 0.78em;
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+
+/* Dấu chấm trạng thái (dùng độc lập ngoài avatar-container) */
+.status-dot { width: 10px; height: 10px; border-radius: 50%; background-color: #ccc; display: inline-block; margin-top: 2px; }
+.status-dot.online { background-color: #28a745; box-shadow: 0 0 3px #28a745; }
+
+.partner-status {
+    font-size: 0.9em;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    color: #7f8c8d;
+}
+.partner-status::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: #bdc3c7;
+}
+.partner-status.online { color: #009933; }
+.partner-status.online::before {
+    background: radial-gradient(circle at 30% 30%, #5cd65c, #009933);
+    box-shadow: 0 0 4px rgba(0, 153, 51, 0.4);
+}
+
+/* Sidebar header */
+.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+.notification-container { position: relative; }
+
+.icon-btn { background: none; border: none; font-size: 1.3em; cursor: pointer; position: relative; padding: 0; display: flex; align-items: center; }
+.badge { position: absolute; top: 0; right: 0; background: red; color: white; font-size: 0.4em; padding: 2px 5px; border-radius: 50%; }
+
+/* Popup danh sách */
+.requests-popup {
+    position: absolute;
+    top: 40px;
+    left: 0;
+    width: 250px;
+    background: white;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    border-radius: 8px;
+    padding: 10px;
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+}
+.requests-popup h4 { margin: 0 0 10px 0; font-size: 0.9em; color: #666; }
+.requests-popup ul { list-style: none; padding: 0; margin: 0; }
+.requests-popup li { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; }
+.btn-accept { background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+.btn-accept:hover { background: #218838; }
+
+/* My Profile */
+.my-profile {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #eee;
+    margin-bottom: 15px;
+}
+.user-name {
+    margin: 0;
+    font-size: 1.1em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+}
+.profile-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.small-btn {
+    background-color: #ff4d4d;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 30px;
+}
+.small-btn:hover { background-color: #cc0000; }
+
+/* Nút 3 chấm */
+.contact-options-btn {
+    background: none;
+    border: none;
+    color: transparent;
+    font-size: 1.2em;
+    padding: 0 5px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 0.15s;
+}
+.contact-item:hover .contact-options-btn { color: #999; }
+.contact-options-btn:hover { color: #333 !important; }
+
+/* Menu Dropdown */
+.options-menu {
+    position: fixed;
+    background: white;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    border-radius: 7px;
+    z-index: 9999;
+    overflow: hidden;
+    width: 140px;
+    border: 1px solid #e8e8e8;
+}
+.options-menu button {
+    display: block;
+    width: 100%;
+    padding: 10px 14px;
+    border: none;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.88em;
+    transition: background 0.12s;
+}
+.options-menu button:hover { background-color: #f5f5f5; }
+.options-menu button.danger { color: #e03131; font-weight: 500; }
+
+/* Block Overlay */
+.block-overlay {
+    background-color: #242526;
+    color: #e4e6eb;
+    text-align: center;
+    padding: 20px;
+    border-top: 1px solid #3e4042;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-height: 80px;
+}
+.block-overlay h4 { margin: 0; font-size: 16px; font-weight: 600; }
+.block-overlay p { margin: 0; font-size: 14px; color: #b0b3b8; }
+.block-btn {
+    background-color: #3a3b3c;
+    color: #e4e6eb;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    max-width: 350px;
+    margin-top: 10px;
+    transition: background-color 0.2s;
+}
+.block-btn:hover { background-color: #4e4f50; }
+
+/* Unread badge */
+.unread-badge {
+    min-width: 20px;
+    height: 20px;
+    background: #ef4444;
+    color: white;
+    font-size: 0.72em;
+    font-weight: 700;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    flex-shrink: 0;
+    margin-left: 4px;
+    margin-right: 6px;
+}
+
+/* Sidebar tabs */
+.sidebar-tabs {
+    display: flex;
+    border-bottom: 2px solid #e0e0e0;
+    margin-bottom: 10px;
+}
+.tab-btn {
+    flex: 1;
+    padding: 8px 0;
+    border: none;
+    background: none;
+    font-size: 13px;
+    font-weight: 500;
+    color: #888;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color .15s, border-color .15s;
+}
+.tab-btn.active { color: #0084ff; border-bottom-color: #0084ff; }
+.tab-btn:hover:not(.active) { color: #444; }
+
+/* Create group button */
+.group-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.btn-create-group {
+    background: #0084ff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+}
+.btn-create-group:hover { background: #006de0; }
+
+/* Group avatar */
+.group-avatar { background: #7c3aed !important; }
+
+/* Manage group button in header */
+.btn-manage-group {
+    background: none;
+    border: 1px solid #c0c0c0;
+    border-radius: 6px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-left: auto;
+    transition: background .15s;
+}
+.btn-manage-group:hover { background: #f0f0f0; }
+
+/* Group sender label */
+.group-sender-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #7c3aed;
+    margin-bottom: 2px;
+    padding-left: 2px;
+}

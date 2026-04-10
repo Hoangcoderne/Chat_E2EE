@@ -46,23 +46,32 @@ beforeEach(() => { jest.clearAllMocks(); global.onlineUsers.clear(); });
 
 // ════════════════════════════════════════════════════════════════════════
 describe('chatController.getChatHistory()', () => {
-  test('trả danh sách messages sort theo timestamp', async () => {
+  test('trả danh sách messages (paginated)', async () => {
     const msgs = [
       { ...fakeMsg({ sender: 'uid_alice', timestamp: new Date('2026-01-01') }) },
       { ...fakeMsg({ sender: 'uid_bob',   timestamp: new Date('2026-01-02') }) },
     ];
-    // Mongoose query chain: find().sort()
-    Message.find.mockReturnValue({ sort: jest.fn().mockResolvedValue(msgs) });
+    // Mongoose query chain: find().sort().limit()
+    Message.find.mockReturnValue({
+      sort: jest.fn().mockReturnValue({
+        limit: jest.fn().mockResolvedValue(msgs)
+      })
+    });
     Message.updateMany.mockResolvedValue({ modifiedCount: 0 });
 
     const res = mkRes();
     await chatController.getChatHistory(mkReq({}, { partnerId: 'uid_bob' }), res);
 
-    expect(res._body).toHaveLength(2);
+    expect(res._body.messages).toHaveLength(2);
+    expect(res._body).toHaveProperty('hasMore');
   });
 
   test('messages từ partner → gọi updateMany để mark read', async () => {
-    Message.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
+    Message.find.mockReturnValue({
+      sort: jest.fn().mockReturnValue({
+        limit: jest.fn().mockResolvedValue([])
+      })
+    });
     Message.updateMany.mockResolvedValue({ modifiedCount: 1 });
 
     await chatController.getChatHistory(mkReq({}, { partnerId: 'uid_bob' }), mkRes());
@@ -74,7 +83,11 @@ describe('chatController.getChatHistory()', () => {
   });
 
   test('IDOR: chỉ query messages của đúng cặp user (dùng userId từ JWT)', async () => {
-    Message.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
+    Message.find.mockReturnValue({
+      sort: jest.fn().mockReturnValue({
+        limit: jest.fn().mockResolvedValue([])
+      })
+    });
     Message.updateMany.mockResolvedValue({});
 
     await chatController.getChatHistory(mkReq({}, { partnerId: 'uid_bob' }, 'uid_alice'), mkRes());

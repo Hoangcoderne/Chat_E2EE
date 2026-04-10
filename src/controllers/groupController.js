@@ -1,8 +1,9 @@
 // src/controllers/groupController.js
-const mongoose   = require('mongoose');
+const mongoose     = require('mongoose');
 const Group        = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
 const User         = require('../models/User');
+const logger       = require('../utils/logger');
 
 const { isAdmin, isMember } = require('../services/groupService');
 
@@ -17,7 +18,7 @@ exports.getMemberKeys = async (req, res) => {
         const users = await User.find({ _id: { $in: ids } }).select('_id username publicKey signingPublicKey');
         res.json(users);
     } catch (err) {
-        console.error(err);
+        logger.error({ event: 'get_member_keys_error', error: err.message });
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
@@ -60,7 +61,7 @@ exports.createGroup = async (req, res) => {
         await group.populate('members.userId', 'username _id publicKey');
         res.status(201).json(group);
     } catch (err) {
-        console.error('Create group error:', err);
+        logger.error({ event: 'create_group_error', error: err.message });
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
@@ -100,26 +101,32 @@ exports.getGroups = async (req, res) => {
 
         res.json(result);
     } catch (err) {
-        console.error(err);
+        logger.error({ event: 'get_groups_error', error: err.message });
         res.status(500).json([]);
     }
 };
 
-// Lịch sử tin nhắn nhóm
-// GET /api/groups/:groupId/history
+// Lịch sử tin nhắn nhóm (cursor-based pagination)
+// GET /api/groups/:groupId/history?before=<ISO_timestamp>&limit=<number>
 exports.getGroupHistory = async (req, res) => {
     try {
         const userId  = req.user.userId;
         const { groupId } = req.params;
+        const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+        const before = req.query.before ? new Date(req.query.before) : null;
 
         const group = await Group.findById(groupId);
         if (!group || !isMember(group, userId))
             return res.status(403).json({ message: 'Bạn không trong nhóm này' });
 
-        const messages = await GroupMessage.find({ groupId })
+        const filter = { groupId };
+        if (before) filter.timestamp = { $lt: before };
+
+        const messages = await GroupMessage.find(filter)
             .populate('sender', 'username _id')
-            .populate('readBy', 'username _id')   // populate để client có username hiển thị seen list
-            .sort({ timestamp: 1 });
+            .populate('readBy', 'username _id')
+            .sort({ timestamp: -1 })
+            .limit(limit);
 
         // Đánh dấu đã đọc
         await GroupMessage.updateMany(
@@ -127,9 +134,12 @@ exports.getGroupHistory = async (req, res) => {
             { $addToSet: { readBy: userId } }
         );
 
-        res.json(messages);
+        res.json({
+            messages: messages.reverse(),
+            hasMore: messages.length === limit,
+        });
     } catch (err) {
-        console.error(err);
+        logger.error({ event: 'get_group_history_error', error: err.message });
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
@@ -164,7 +174,7 @@ exports.addMember = async (req, res) => {
 
         res.json({ success: true, newMember: { _id: user._id, username: user.username } });
     } catch (err) {
-        console.error(err);
+        logger.error({ event: 'add_member_error', error: err.message });
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
@@ -204,7 +214,7 @@ exports.removeMember = async (req, res) => {
 
         res.json({ success: true, removedName });
     } catch (err) {
-        console.error(err);
+        logger.error({ event: 'remove_member_error', error: err.message });
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
@@ -249,7 +259,7 @@ exports.leaveGroup = async (req, res) => {
 
         res.json({ success: true, leavingName });
     } catch (err) {
-        console.error(err);
+        logger.error({ event: 'leave_group_error', error: err.message });
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
@@ -279,7 +289,7 @@ exports.getMyGroupKey = async (req, res) => {
             keyHolderPublicKey: keyHolder?.publicKey
         });
     } catch (err) {
-        console.error(err);
+        logger.error({ event: 'get_my_group_key_error', error: err.message });
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
@@ -309,7 +319,7 @@ exports.getGroupInfo = async (req, res) => {
 
         res.json(group);
     } catch (err) {
-        console.error('getGroupInfo error:', err);
+        logger.error({ event: 'get_group_info_error', error: err.message });
         res.status(500).json({ message: 'Lỗi server' });
     }
 };
@@ -350,7 +360,7 @@ exports.toggleGroupReaction = async (req, res) => {
 
         res.json({ success: true, reactions: msg.reactions, messageId, groupId: msg.groupId.toString() });
     } catch (err) {
-        console.error('Toggle group reaction error:', err);
+        logger.error({ event: 'toggle_group_reaction_error', error: err.message });
         res.status(500).json({ success: false, message: 'Lỗi server.' });
     }
 };
@@ -378,7 +388,7 @@ exports.deleteGroupMessage = async (req, res) => {
 
         res.json({ success: true, messageId, groupId });
     } catch (err) {
-        console.error('Delete group message error:', err);
+        logger.error({ event: 'delete_group_message_error', error: err.message });
         res.status(500).json({ success: false, message: 'Lỗi server.' });
     }
 };

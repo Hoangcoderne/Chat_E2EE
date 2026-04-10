@@ -1,10 +1,12 @@
 // src/app.js
-// Chỉ khởi tạo Express app, gắn middleware và routes.
+// Khởi tạo Express app, gắn middleware và routes.
 
 const express      = require('express');
 const path         = require('path');
 const helmet       = require('helmet');
+const cors         = require('cors');
 const cookieParser = require('cookie-parser');
+const mongoose     = require('mongoose');
 
 const logger        = require('./utils/logger');
 const requestLogger = require('./middleware/requestLogger');
@@ -21,14 +23,33 @@ const app = express();
 // Không có → rate limit dùng IP proxy thay vì IP client thật.
 app.set('trust proxy', 1);
 
-//  Security headers (Helmet) ─
+//  HTTPS enforcement (production only)
+// Redirect HTTP → HTTPS khi deploy sau reverse proxy.
+if (process.env.NODE_ENV === 'production') {
+    app.use((req, res, next) => {
+        if (req.headers['x-forwarded-proto'] !== 'https') {
+            return res.redirect(301, `https://${req.headers.host}${req.url}`);
+        }
+        next();
+    });
+}
+
+//  CORS middleware
+// Cho phép frontend gọi API từ domain khác (cần thiết khi tách FE/BE).
+app.use(cors({
+    origin:      process.env.FRONTEND_URL,
+    methods:     ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true,                              // Cho phép gửi cookies (refresh token)
+}));
+
+//  Security headers (Helmet)
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc:  ["'self'"],
             scriptSrc:   ["'self'"],
             scriptSrcAttr: ["'none'"],        // Chặn inline onclick="..."
-            styleSrc:    ["'self'", "'unsafe-inline'"],
+            styleSrc:    ["'self'"],
             imgSrc:      ["'self'", "data:"],
             connectSrc:  ["'self'", "ws:", "wss:"],
             fontSrc:     ["'self'"],
@@ -40,18 +61,32 @@ app.use(helmet({
     crossOriginEmbedderPolicy: false,
 }));
 
-//  Body / Cookie parsers 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+//  Body / Cookie parsers (giới hạn body size 16KB chống payload quá lớn)
+app.use(express.json({ limit: '16kb' }));
+app.use(express.urlencoded({ extended: true, limit: '16kb' }));
 app.use(cookieParser());
 
 //  HTTP request logging 
 app.use(requestLogger);
 
+//  Health check endpoint
+// Dùng cho monitoring, load balancer, Docker health checks.
+app.get('/health', async (req, res) => {
+    const dbState = mongoose.connection.readyState;
+    const dbStatus = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+    const healthy = dbState === 1;
+
+    res.status(healthy ? 200 : 503).json({
+        status:  healthy ? 'ok' : 'degraded',
+        uptime:  Math.floor(process.uptime()),
+        db:      dbStatus[dbState] || 'unknown',
+    });
+});
+
 //  Static files 
 app.use(express.static(path.join(__dirname, '../public')));
 
-//  Rate limiting ─
+//  Rate limiting
 // Thứ tự quan trọng: specific limiters TRƯỚC apiLimiter chung
 app.use('/api/auth/login',           authLimiter);
 app.use('/api/auth/register',        registerLimiter);

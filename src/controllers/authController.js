@@ -198,7 +198,7 @@ exports.resetPassword = async (req, res) => {
     }
 };
 
-// REFRESH TOKEN
+// REFRESH TOKEN (Rotation: revoke cũ → issue mới)
 exports.refreshToken = async (req, res) => {
     try {
         const refreshToken = req.cookies.refreshToken;
@@ -215,10 +215,15 @@ exports.refreshToken = async (req, res) => {
         const user = await User.findById(storedToken.userId);
         if (!user) return res.status(401).json({ message: "Người dùng không tồn tại" });
 
+        // Rotation: revoke token cũ
+        storedToken.revoked = true;
+        await storedToken.save();
+
+        // Issue token mới
         const newAccessToken = signAccessToken({ userId: user._id, username: user.username });
+        await issueRefreshToken(res, user._id);
 
-
-        logger.info({ event: 'token_refreshed', userId: user._id });
+        logger.info({ event: 'token_refreshed_rotated', userId: user._id });
         res.json({ accessToken: newAccessToken });
 
     } catch (err) {

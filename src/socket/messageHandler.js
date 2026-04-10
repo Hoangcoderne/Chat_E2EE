@@ -7,6 +7,7 @@ const Message    = require('../models/Message');
 const User       = require('../models/User');
 const Friendship = require('../models/Friendship');
 const logger     = require('../utils/logger');
+const { validateSocketPayload, SCHEMAS } = require('../utils/socketValidator');
 
 /**
  * @param {import('socket.io').Server} io
@@ -15,8 +16,12 @@ const logger     = require('../utils/logger');
 module.exports = function messageHandler(io, socket) {
 
     //  request_public_key: lấy public key + signing key của đối tác 
-    socket.on('request_public_key', async ({ username }) => {
+    socket.on('request_public_key', async (data) => {
         try {
+            const check = validateSocketPayload(data, SCHEMAS.request_public_key);
+            if (!check.valid) return socket.emit('error', check.error);
+
+            const { username } = data;
             const user = await User.findOne({ username }).select('_id username publicKey signingPublicKey');
             if (user) {
                 socket.emit('response_public_key', {
@@ -34,8 +39,13 @@ module.exports = function messageHandler(io, socket) {
     });
 
     //  send_message: relay tin nhắn E2EE
-    socket.on('send_message', async ({ recipientId, encryptedContent, iv, signature, replyTo }) => {
+    socket.on('send_message', async (data) => {
         try {
+            const check = validateSocketPayload(data, SCHEMAS.send_message);
+            if (!check.valid) return socket.emit('error', check.error);
+
+            const { recipientId, encryptedContent, iv, signature, replyTo } = data;
+
             if (!socket.userId)
                 return socket.emit('error', 'Phiên kết nối bị gián đoạn. Vui lòng nhấn F5.');
 

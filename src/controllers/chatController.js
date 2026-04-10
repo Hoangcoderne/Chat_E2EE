@@ -4,28 +4,42 @@ const Message     = require('../models/Message');
 const User        = require('../models/User');
 const Friendship  = require('../models/Friendship');
 const onlineUsers = require('../utils/onlineUsers');
+const logger      = require('../utils/logger');
 
-// Lịch sử chat 
+// Lịch sử chat (cursor-based pagination)
+// Query params: ?before=<ISO_timestamp>&limit=<number>
 exports.getChatHistory = async (req, res) => {
     try {
         const currentUserId = req.user.userId;
         const { partnerId }  = req.params;
+        const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+        const before = req.query.before ? new Date(req.query.before) : null;
 
-        const messages = await Message.find({
+        const filter = {
             $or: [
                 { sender: currentUserId, recipient: partnerId },
                 { sender: partnerId,     recipient: currentUserId }
             ]
-        }).sort({ timestamp: 1 });
+        };
+        if (before) filter.timestamp = { $lt: before };
 
+        const messages = await Message.find(filter)
+            .sort({ timestamp: -1 })  // Mới nhất trước
+            .limit(limit);
+
+        // Đánh dấu đã đọc
         await Message.updateMany(
             { sender: partnerId, recipient: currentUserId, read: false },
             { read: true }
         );
 
-        res.json(messages);
+        // Trả về theo thứ tự cũ → mới cho frontend render
+        res.json({
+            messages: messages.reverse(),
+            hasMore: messages.length === limit,
+        });
     } catch (err) {
-        console.error("Lỗi lấy lịch sử chat:", err);
+        logger.error({ event: 'get_chat_history_error', error: err.message });
         res.status(500).json({ message: "Lỗi server" });
     }
 };
@@ -63,7 +77,7 @@ exports.getContacts = async (req, res) => {
 
         res.json(contacts);
     } catch (err) {
-        console.error(err);
+        logger.error({ event: 'get_contacts_error', error: err.message });
         res.status(500).json([]);
     }
 };
@@ -94,7 +108,7 @@ exports.getFriendRequests = async (req, res) => {
         }).populate('requester', 'username _id');
         res.json(requests.map(r => ({ fromId: r.requester._id, fromUser: r.requester.username })));
     } catch (err) {
-        console.error(err);
+        logger.error({ event: 'get_friend_requests_error', error: err.message });
         res.status(500).json([]);
     }
 };
@@ -106,7 +120,7 @@ exports.getNotifications = async (req, res) => {
         const user = await User.findById(currentUserId).select('notifications');
         res.json(user.notifications.sort((a, b) => b.createdAt - a.createdAt));
     } catch (err) {
-        console.error(err);
+        logger.error({ event: 'get_notifications_error', error: err.message });
         res.status(500).json([]);
     }
 };
@@ -173,7 +187,7 @@ exports.deleteMessage = async (req, res) => {
 
         res.json({ success: true, messageId, recipientId });
     } catch (err) {
-        console.error("Lỗi xoá tin nhắn:", err);
+        logger.error({ event: 'delete_message_error', error: err.message });
         res.status(500).json({ success: false, message: "Lỗi server." });
     }
 };
@@ -219,7 +233,7 @@ exports.toggleReaction = async (req, res) => {
         const partnerId = isSender ? msg.recipient.toString() : msg.sender.toString();
         res.json({ success: true, reactions: msg.reactions, messageId, partnerId });
     } catch (err) {
-        console.error("Lỗi toggle reaction:", err);
+        logger.error({ event: 'toggle_reaction_error', error: err.message });
         res.status(500).json({ success: false, message: "Lỗi server." });
     }
 };

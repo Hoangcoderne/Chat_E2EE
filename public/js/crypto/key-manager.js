@@ -57,18 +57,14 @@ export async function deriveKeysFromPassword(password, saltBuffer) {
     };
 }
 
-/**
- * 2. Sinh cặp khóa ECDH
- */
+// 2. Sinh cặp khóa ECDH
 export async function generateKeyPair() {
     return await window.crypto.subtle.generateKey(
         ALG_KEY_GEN, true, ["deriveKey", "deriveBits"]
     );
 }
 
-/**
- * 3. Mã hóa Private Key (Key Wrapping)
- */
+// 3. Mã hóa Private Key (Key Wrapping)
 export async function exportAndEncryptPrivateKey(privateKey, encryptionKey) {
     const exportedKey = await window.crypto.subtle.exportKey("pkcs8", privateKey);
     const iv = window.crypto.getRandomValues(new Uint8Array(12));
@@ -85,9 +81,7 @@ export async function exportAndEncryptPrivateKey(privateKey, encryptionKey) {
     };
 }
 
-/**
- * 4. Giải mã Private Key (Key Unwrapping)
- */
+// 4. Giải mã Private Key (Key Unwrapping)
 export async function decryptAndImportPrivateKey(encryptedBase64, ivBase64, encryptionKey, extractable = false) {
     const iv = base64ToArrayBuffer(ivBase64);
     const data = base64ToArrayBuffer(encryptedBase64);
@@ -103,9 +97,7 @@ export async function decryptAndImportPrivateKey(encryptedBase64, ivBase64, encr
     );
 }
 
-/**
- * 5. Xuất/Nhập Public Key & Chat
- */
+// 5. Xuất/Nhập Public Key & Chat
 export async function exportPublicKey(publicKey) {
     const exported = await window.crypto.subtle.exportKey("spki", publicKey);
     return arrayBufferToBase64(exported);
@@ -144,11 +136,7 @@ export async function decryptMessage(encryptedObj, sharedKey) {
     );
     return new TextDecoder().decode(decryptedBuffer);
 }
-
-// ============================================================
 // RECOVERY KEY
-// ============================================================
-
 export function generateRecoveryKey() {
     const raw = window.crypto.getRandomValues(new Uint8Array(32));
     const hex = Array.from(raw).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -170,11 +158,7 @@ export async function importRecoveryKeyFromRaw(rawBytes) {
         "raw", rawBytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]
     );
 }
-
-// ============================================================
 // DIGITAL SIGNATURE (ECDSA P-256)
-// ============================================================
-
 export async function generateSigningKeyPair() {
     return await window.crypto.subtle.generateKey(
         { name: "ECDSA", namedCurve: "P-256" },

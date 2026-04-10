@@ -7,6 +7,7 @@
 const Group        = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
 const logger       = require('../utils/logger');
+const { validateSocketPayload, SCHEMAS } = require('../utils/socketValidator');
 
 /**
  * @param {import('socket.io').Server} io
@@ -14,15 +15,40 @@ const logger       = require('../utils/logger');
  */
 module.exports = function groupHandler(io, socket) {
 
-    // join_groups: tham gia các socket room của nhóm
-    socket.on('join_groups', (groupIds) => {
-        if (!Array.isArray(groupIds)) return;
-        groupIds.forEach(gid => socket.join('group:' + gid));
+    // join_groups: tham gia các socket room của nhóm — verify membership
+    socket.on('join_groups', async (groupIds) => {
+        if (!Array.isArray(groupIds) || groupIds.length > 100) return;
+        try {
+            // Query chỉ các group mà user thật sự là member
+            const groups = await Group.find({
+                _id: { $in: groupIds },
+                'members.userId': socket.userId,
+            }).select('_id');
+
+            const validIds = groups.map(g => g._id.toString());
+            validIds.forEach(gid => socket.join('group:' + gid));
+
+            if (validIds.length < groupIds.length) {
+                logger.warn({
+                    event: 'join_groups_filtered',
+                    userId: socket.userId,
+                    requested: groupIds.length,
+                    allowed: validIds.length,
+                });
+            }
+        } catch (err) {
+            logger.error({ event: 'join_groups_error', error: err.message });
+        }
     });
 
     // send_group_message: relay tin nhắn nhóm E2EE
-    socket.on('send_group_message', async ({ groupId, encryptedContent, iv, signature, replyTo }) => {
+    socket.on('send_group_message', async (data) => {
         try {
+            const check = validateSocketPayload(data, SCHEMAS.send_group_message);
+            if (!check.valid) return socket.emit('error', check.error);
+
+            const { groupId, encryptedContent, iv, signature, replyTo } = data;
+
             if (!socket.userId)
                 return socket.emit('error', 'Phiên kết nối bị gián đoạn.');
 

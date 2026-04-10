@@ -133,12 +133,15 @@ describe('authController.getSalt()', () => {
     expect(res._body).toEqual({ salt: 'mySalt123==' });
   });
 
-  test('username không tồn tại → 404', async () => {
+  test('username không tồn tại → vẫn 200 + trả fake salt (chống enumeration)', async () => {
     User.findOne.mockResolvedValue(null);
     const req = mkReq({}, {}, { username: 'ghost' }); const res = mkRes();
     await authController.getSalt(req, res);
 
-    expect(res._status).toBe(404);
+    // Phải trả 200 với salt (fake) — không lộ user không tồn tại
+    expect(res._status).toBeNull(); // 200 mặc định
+    expect(res._body).toHaveProperty('salt');
+    expect(typeof res._body.salt).toBe('string');
   });
 
   test('thiếu username param → 400', async () => {
@@ -190,22 +193,22 @@ describe('authController.login()', () => {
     expect(res._body.user).toHaveProperty('encryptedSigningPrivateKey');
   });
 
-  test('sai authKeyHash → 400', async () => {
+  test('sai authKeyHash → 401 (unified error)', async () => {
     const fakeUser = await makeFakeUser({ username: 'alice', _id: { toString: () => 'uid004' } });
     User.findOne.mockResolvedValue(fakeUser);
 
     const req = mkReq({ username: 'alice', authKeyHash: 'wrongKey==' }); const res = mkRes();
     await authController.login(req, res);
 
-    expect(res._status).toBe(400);
+    expect(res._status).toBe(401);
   });
 
-  test('username không tồn tại → 404', async () => {
+  test('username không tồn tại → 401 (unified error, chống enumeration)', async () => {
     User.findOne.mockResolvedValue(null);
     const req = mkReq({ username: 'ghost', authKeyHash: DEFAULT_AUTH_KEY }); const res = mkRes();
     await authController.login(req, res);
 
-    expect(res._status).toBe(404);
+    expect(res._status).toBe(401);
   });
 
   test('refreshToken được lưu dưới dạng SHA-256 hash (không phải plaintext)', async () => {
@@ -226,15 +229,22 @@ describe('authController.login()', () => {
 
 // ════════════════════════════════════════════════════════════════════════════
 describe('authController.refreshToken()', () => {
-  test('cookie hợp lệ → 200 + accessToken mới', async () => {
+  test('cookie hợp lệ → 200 + accessToken mới + rotation (new cookie)', async () => {
     const rt = makeFakeRefreshToken('uid006');
-    RefreshToken.findOne = jest.fn().mockResolvedValue({ ...rt, revoked: false, expiresAt: new Date(Date.now() + 9999999) });
+    const storedToken = { ...rt, revoked: false, expiresAt: new Date(Date.now() + 9999999), save: jest.fn().mockResolvedValue(true) };
+    RefreshToken.findOne = jest.fn().mockResolvedValue(storedToken);
+    RefreshToken.create  = jest.fn().mockResolvedValue({});
     User.findById = jest.fn().mockResolvedValue(await makeFakeUser({ username: 'bob', _id: { toString: () => 'uid006' } }));
 
     const req = mkReq({}, { refreshToken: rt.__plain }); const res = mkRes();
     await authController.refreshToken(req, res);
 
     expect(res._body).toHaveProperty('accessToken');
+    // Rotation: old token revoked
+    expect(storedToken.save).toHaveBeenCalled();
+    expect(storedToken.revoked).toBe(true);
+    // Rotation: new cookie issued
+    expect(res._cookies['refreshToken']).toBeDefined();
   });
 
   test('token đã revoked → 401', async () => {
