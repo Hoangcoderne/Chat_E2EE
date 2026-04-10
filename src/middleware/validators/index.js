@@ -5,9 +5,11 @@
 const { handleValidationErrors } = require('./common');
 const authValidators  = require('./authValidators');
 const chatValidators  = require('./chatValidators');
+const groupValidators = require('./groupValidators');
 
 module.exports = {
     handleValidationErrors,
     ...authValidators,
     ...chatValidators,
+    ...groupValidators,
 };

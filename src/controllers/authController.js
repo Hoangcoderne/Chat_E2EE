@@ -1,25 +1,10 @@
 // src/controllers/authController.js
 const User = require('../models/User');
 const RefreshToken = require('../models/RefreshToken');
-const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');                        
-const { hashToken, generateRefreshToken, hashPassword, verifyPassword } = require('../utils/crypto'); 
+const { hashToken, hashPassword, verifyPassword } = require('../utils/crypto');
+const { signAccessToken, issueRefreshToken, buildUserPayload } = require('../services/authService');
 
-// HELPER: Tạo & lưu Refresh Token, set HttpOnly Cookie
-async function issueRefreshToken(res, userId) {
-    const refreshTokenPlain = generateRefreshToken();
-    const refreshTokenHash  = hashToken(refreshTokenPlain);
-
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    await RefreshToken.create({ userId, tokenHash: refreshTokenHash, expiresAt, revoked: false });
-
-    res.cookie('refreshToken', refreshTokenPlain, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000
-    });
-}
 
 // 1. ĐĂNG KÝ
 exports.register = async (req, res) => {
@@ -110,12 +95,7 @@ exports.login = async (req, res) => {
             return res.status(400).json({ message: "Mật khẩu không đúng" });
         }
 
-        const accessToken = jwt.sign(
-            { userId: user._id, username: user.username },
-            process.env.SESSION_SECRET,
-            { expiresIn: '15m' }
-        );
-
+        const accessToken = signAccessToken({ userId: user._id, username: user.username });
         await issueRefreshToken(res, user._id);
 
         logger.info({ event: 'login_success', userId: user._id, username });
@@ -123,16 +103,7 @@ exports.login = async (req, res) => {
         res.json({
             message: "Đăng nhập thành công",
             accessToken,
-            user: {
-                userId: user._id,
-                username: user.username,
-                publicKey: user.publicKey,
-                encryptedPrivateKey: user.encryptedPrivateKey,
-                iv: user.iv,
-                signingPublicKey: user.signingPublicKey,
-                encryptedSigningPrivateKey: user.encryptedSigningPrivateKey,
-                signingIv: user.signingIv
-            }
+            user: buildUserPayload(user),
         });
 
     } catch (err) {
@@ -235,11 +206,8 @@ exports.refreshToken = async (req, res) => {
         const user = await User.findById(storedToken.userId);
         if (!user) return res.status(401).json({ message: "Người dùng không tồn tại" });
 
-        const newAccessToken = jwt.sign(
-            { userId: user._id, username: user.username },
-            process.env.SESSION_SECRET,
-            { expiresIn: '15m' }
-        );
+        const newAccessToken = signAccessToken({ userId: user._id, username: user.username });
+
 
         logger.info({ event: 'token_refreshed', userId: user._id });
         res.json({ accessToken: newAccessToken });

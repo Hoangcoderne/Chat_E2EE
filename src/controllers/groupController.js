@@ -4,19 +4,7 @@ const Group        = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
 const User         = require('../models/User');
 
-// Helper
-// Lưu ý: sau khi .populate('members.userId'), m.userId là object {_id,...}
-// Trước populate: m.userId là ObjectId → .toString() trả về id string
-// Cần xử lý cả 2 trường hợp
-function isAdmin(group, userId) {
-    return group.admins.some(a => (a._id || a).toString() === userId.toString());
-}
-function isMember(group, userId) {
-    return group.members.some(m => {
-        const mid = m.userId?._id || m.userId; // populated hoặc chưa
-        return mid?.toString() === userId.toString();
-    });
-}
+const { isAdmin, isMember } = require('../services/groupService');
 
 // Lấy public key nhiều user cùng lúc (để client mã hoá group key)
 // GET /api/groups/member-keys?userIds=id1,id2,...
@@ -340,7 +328,6 @@ exports.toggleGroupReaction = async (req, res) => {
         if (!VALID.includes(emoji))
             return res.status(400).json({ success: false, message: 'Emoji không hợp lệ.' });
 
-        const GroupMessage = require('../models/GroupMessage');
         const msg = await GroupMessage.findById(messageId);
         if (!msg) return res.status(404).json({ success: false, message: 'Tin nhắn không tồn tại.' });
 
@@ -378,7 +365,6 @@ exports.deleteGroupMessage = async (req, res) => {
         if (!messageId || !mongoose.Types.ObjectId.isValid(messageId))
             return res.status(400).json({ success: false, message: 'messageId không hợp lệ.' });
 
-        const GroupMessage = require('../models/GroupMessage');
         const msg = await GroupMessage.findById(messageId);
         if (!msg)
             return res.status(404).json({ success: false, message: 'Tin nhắn không tồn tại.' });
