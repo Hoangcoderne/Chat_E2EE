@@ -35,7 +35,8 @@ export async function loadChatHistory(socket) {
         const res = await authFetch(`/api/chat/history/${partnerId}`);
         if (!res) return;
 
-        const messages = await res.json();
+        const data = await res.json();
+        const messages = data.messages || data;   // backward compat: hỗ trợ cả format cũ (array) và mới ({ messages, hasMore })
         dom.messagesList.innerHTML = '';
 
         if (messages.length === 0) {
@@ -122,7 +123,8 @@ export async function loadGroupHistory(groupId, socket) {
     try {
         const res = await authFetch(`/api/groups/${groupId}/history`);
         if (!res) return;
-        const messages = await res.json();
+        const data = await res.json();
+        const messages = data.messages || data;
 
         dom.messagesList.innerHTML = '';
         if (messages.length === 0) {
