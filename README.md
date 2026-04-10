@@ -5,6 +5,7 @@
 ---
 
 ## Demo
+
 ### Image Demo
 
 | Register | Login |
@@ -28,7 +29,7 @@ https://chat-e2ee-sjvl.onrender.com/
 
 ## How It Works
 
-![Register](image/Flow.png)
+![Flow](image/Flow.png)
 
 ---
 
@@ -101,7 +102,7 @@ https://chat-e2ee-sjvl.onrender.com/
 | Auth | JWT (jsonwebtoken), bcryptjs, HttpOnly Cookies |
 | Security | helmet, express-rate-limit, express-validator |
 | Logging | Winston |
-| Testing | Jest |
+| Testing | Jest, Supertest |
 
 ---
 
@@ -323,49 +324,101 @@ CHAT_E2EE/
 ├── .env
 ├── package.json
 │
-├── src/                          # Backend (Node.js / Express)
-│   ├── server.js                 # Express app, Socket.io events, middleware
+├── src/                              # Backend (Node.js / Express)
+│   ├── app.js                        # Express setup: middleware, routes, error handler
+│   ├── server.js                     # HTTP server entry point: DB connect, Socket.io init, listen
+│   │
 │   ├── config/
-│   │   └── db.js
+│   │   └── db.js                     # Mongoose connection
+│   │
 │   ├── models/
 │   │   ├── User.js
-│   │   ├── Message.js            # + read, reactions, replyTo fields
-│   │   ├── GroupMessage.js       # + type, systemText, readBy, reactions, replyTo
-│   │   ├── Group.js              # per-member encrypted group key
+│   │   ├── Message.js                # + read, reactions, replyTo fields
+│   │   ├── GroupMessage.js           # + type, systemText, readBy, reactions, replyTo
+│   │   ├── Group.js                  # per-member encrypted group key
 │   │   ├── Friendship.js
-│   │   └── RefreshToken.js       # HttpOnly cookie session store
+│   │   └── RefreshToken.js           # HttpOnly cookie session store
+│   │
 │   ├── controllers/
-│   │   ├── authController.js     # Register, login, refresh, logout, password reset
-│   │   ├── chatController.js     # History, contacts (+ unreadCount), block, unfriend, reactions
-│   │   └── groupController.js    # Group CRUD, member management, group reactions
+│   │   ├── authController.js         # Register, login, refresh, logout, password reset
+│   │   ├── chatController.js         # History, contacts (+ unreadCount), block, unfriend, reactions
+│   │   └── groupController.js        # Group CRUD, member management, group reactions
+│   │
 │   ├── routes/
 │   │   ├── authRoutes.js
 │   │   ├── chatRoutes.js
 │   │   └── groupRoutes.js
+│   │
+│   ├── socket/                       # Socket.io handlers — split by domain
+│   │   ├── index.js                  # Registers all handlers on io.on('connection')
+│   │   ├── presenceHandler.js        # join_user, disconnect, online status
+│   │   ├── messageHandler.js         # send_message, mark_read, reactions, block notify
+│   │   ├── friendHandler.js          # send/accept friend request, clear notification
+│   │   └── groupHandler.js           # send_group_message, mark_group_read, member events
+│   │
+│   ├── services/
+│   │   ├── authService.js            # signAccessToken, issueRefreshToken, revokeAllSessions
+│   │   └── groupService.js           # isAdmin, isMember, isCreator helpers
+│   │
 │   ├── middleware/
-│   │   ├── authMiddleware.js     # JWT verify, TOKEN_EXPIRED code for auto-refresh
-│   │   ├── rateLimiter.js        # Per-route rate limits (login / register / reset)
-│   │   ├── validators.js         # express-validator schemas
-│   │   └── requestLogger.js      # HTTP request logging middleware
-│   └── utils/
-│       ├── logger.js             # Winston structured logger
-│       └── crypto.js             # hashToken, hashPassword, verifyPassword helpers
+│   │   ├── authMiddleware.js         # JWT verify, TOKEN_EXPIRED code for auto-refresh
+│   │   ├── rateLimiter.js            # Per-route rate limits (login / register / reset)
+│   │   ├── requestLogger.js          # HTTP request logging middleware
+│   │   └── validators/               # express-validator schemas — split by domain
+│   │       ├── index.js              # Re-exports all validators
+│   │       ├── common.js             # Shared: validateUsername, validateRecoveryKey
+│   │       ├── authValidators.js     # loginValidation, registerValidation, resetPasswordValidation
+│   │       └── chatValidators.js     # targetIdValidation
+│   │
+│   ├── utils/
+│   │   ├── logger.js                 # Winston structured logger
+│   │   └── crypto.js                 # hashToken, hashPassword, verifyPassword helpers
+│   │
+│   └── __tests__/                    # Test suite — 210 tests, 9 suites
+│       ├── unit/
+│       │   ├── crypto.test.js        # 23 tests — hashToken, bcrypt, generateRefreshToken
+│       │   ├── authMiddleware.test.js # 9 tests — JWT valid/expired/invalid/missing
+│       │   └── validators.test.js    # 26 tests — all validation rules end-to-end
+│       ├── integration/
+│       │   ├── authController.test.js  # 28 tests — register, login, refresh, logout, recovery, reset
+│       │   ├── chatController.test.js  # 24 tests — history, contacts, block, IDOR, reactions
+│       │   └── groupController.test.js # 29 tests — createGroup, member ops, reactions, seen list
+│       ├── api/
+│       │   ├── auth.routes.test.js   # 29 tests — full pipeline: route → validator → controller
+│       │   ├── chat.routes.test.js   # 22 tests — authMiddleware on every route, IDOR check
+│       │   └── group.routes.test.js  # 20 tests — routing + auth guard on all endpoints
+│       └── helpers/
+│           ├── db.js                 # Test DB helper (stub)
+│           └── fixtures.js           # Factory functions for fake users, tokens, groups
 │
-└── public/                       # Frontend (Vanilla JS ES Modules)
+└── public/                           # Frontend (Vanilla JS ES Modules)
     ├── index.html
     ├── login.html
     ├── register.html
     ├── forgot-password.html
     ├── styles/
-    │   └── main.css              # Responsive layout incl. mobile breakpoint (≤768px)
+    │   └── main.css                  # Responsive layout incl. mobile breakpoint (≤768px)
     └── js/
-        ├── app.js                # Main chat UI, socket events, multi-device sync,
-        │                         # reply/forward/reaction/group logic
+        ├── app.js                    # Entry point: init, DOM event listeners only (~120 lines)
+        ├── state.js                  # Single source of truth for all client-side state
+        ├── utils.js                  # authFetch, logout, loadKeyFromDB, formatTime
+        ├── api.js                    # All HTTP API calls: loadContacts, loadChatHistory, loadGroups
+        ├── actions.js                # User actions: sendMessage, deleteMessage, toggleReaction, forward
         ├── login.js
         ├── register.js
         ├── forgot-password.js
-        └── crypto/
-            └── key-manager.js    # All Web Crypto API operations
+        ├── crypto/
+        │   ├── key-manager.js        # All Web Crypto API operations (ECDH, ECDSA, AES-GCM, PBKDF2)
+        │   └── groupCrypto.js        # Group key: encryptForMember, decryptGroupKey, getGroupKey (cached)
+        ├── socket/
+        │   ├── dmSocket.js           # DM + friend + presence socket event handlers
+        │   └── groupSocket.js        # Group socket event handlers
+        └── ui/
+            ├── dom.js                # Centralized DOM element references
+            ├── messageUI.js          # appendMessage, reactions, emoji picker, reply bar, seen list
+            ├── contactUI.js          # renderContactItem, badges, notification popup, block/unfriend
+            ├── groupUI.js            # renderGroupItem, openGroupChat, create/manage group modals
+            └── forwardModal.js       # Forward message modal
 ```
 
 ---
@@ -398,15 +451,36 @@ npm start        # production
 
 ## Running Tests
 
+The test suite covers **210 tests across 9 suites** on 3 levels: Unit, Integration, and API.
+
 ```bash
-# Run all unit tests
+# Run all tests
 npm test
 
+# Run by level
+npm run test:unit         # crypto, authMiddleware, validators
+npm run test:integration  # authController, chatController, groupController
+npm run test:api          # auth routes, chat routes, group routes
+
 # With coverage report
-npm test -- --coverage
+npm run test:coverage
 ```
 
-Tests cover the server-side crypto utility (`src/utils/crypto.js`): token hashing, password hashing, and verification.
+### Test coverage breakdown
+
+| Level | Suites | Tests | What is covered |
+|---|---|---|---|
+| Unit | 3 | 58 | `crypto.js` helpers, JWT middleware branches, all validator rules |
+| Integration | 3 | 81 | Controller logic + IDOR protection + security invariants (via jest.mock) |
+| API | 3 | 71 | Full request pipeline: route → validator → authMiddleware → controller |
+| **Total** | **9** | **210** | |
+
+Key security assertions verified by tests:
+- `authKeyHash` and `recoveryKeyHash` are always bcrypt-hashed before saving (never stored as plaintext)
+- `refreshToken` is stored in DB as SHA-256 hash only (plaintext lives only in the HttpOnly cookie)
+- After password reset, **all** active refresh tokens are revoked (`revoked: true`)
+- IDOR: `deleteMessage` returns 403 when called by the recipient instead of the sender
+- `userId` in every protected endpoint comes from the verified JWT, never from request body
 
 ---
 
