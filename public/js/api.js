@@ -32,11 +32,15 @@ export async function loadChatHistory(socket) {
     if (!userId || !partnerId) return;
 
     try {
+        // Emit trước API call — server sẽ mark read + notify sender ✓✓
+        // Nếu để sau API call, API đã mark read rồi → socket handler tìm 0 unread → không emit messages_read
+        socket.emit('mark_read', { partnerId });
+
         const res = await authFetch(`/api/chat/history/${partnerId}`);
         if (!res) return;
 
         const data = await res.json();
-        const messages = data.messages || data;   // backward compat: hỗ trợ cả format cũ (array) và mới ({ messages, hasMore })
+        const messages = data.messages || data;
         dom.messagesList.innerHTML = '';
 
         if (messages.length === 0) {
@@ -70,7 +74,6 @@ export async function loadChatHistory(socket) {
         }
 
         dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
-        socket.emit('mark_read', { partnerId });
         resetUnreadBadge(partnerId);
         clearContactPreview(partnerId);
     } catch (err) {
