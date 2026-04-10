@@ -12,9 +12,11 @@ import { registerDMSocketHandlers }    from './socket/dmSocket.js';
 import { registerGroupSocketHandlers } from './socket/groupSocket.js';
 import { cancelReply } from './ui/messageUI.js';
 
-// Khởi tạo Socket.io
+// Khởi tạo Socket.io với JWT authentication
 // eslint-disable-next-line no-undef
-const socket = io();
+const socket = io({
+    auth: { token: localStorage.getItem('accessToken') },
+});
 
 // Inject socket vào các module cần dùng
 setContactSocket(socket);
@@ -48,7 +50,7 @@ async function initApp() {
         dom.status.innerText       = '🟢 Online';
         dom.status.style.color     = 'green';
 
-        socket.emit('join_user', userId);
+        socket.emit('join_user');
 
         await loadContacts();
         await loadFriendRequests(updateRequestUI);

@@ -124,22 +124,7 @@ form.addEventListener('submit', async (e) => {
         return;
     }
 
-    // Kiểm tra username đã tồn tại chưa TRƯỚC khi generate keys
-    setLoading(true, 'Đang kiểm tra tên đăng nhập...');
-    try {
-        const checkRes = await fetch(`/api/auth/salt?username=${encodeURIComponent(username)}`);
-        if (checkRes.status === 200) {
-            showError('Tên đăng nhập đã được sử dụng. Vui lòng chọn tên khác.');
-            setLoading(false, 'Đăng ký & Tạo Khóa');
-            return;
-        }
-        // 404 = chưa tồn tại → tiếp tục
-    } catch (err) {
-        showError('Không thể kết nối server. Vui lòng thử lại.');
-        setLoading(false, 'Đăng ký & Tạo Khóa');
-        return;
-    }
-
+    // Username sẽ được kiểm tra bởi API register (trả lỗi nếu đã tồn tại)
     setLoading(true, 'Đang tạo khoá bảo mật...');
 
     try {

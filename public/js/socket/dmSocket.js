@@ -26,11 +26,13 @@ import { notifyNewMessage, clearNotification } from '../ui/notificationUI.js';
 
 export function registerDMSocketHandlers(socket) {
 
-    // Kết nối lại sau ngắt mạng
+    // Kết nối lại sau ngắt mạng — cập nhật token mới nhất
     socket.on('connect', () => {
+        socket.auth = { token: localStorage.getItem('accessToken') };
+
         const userId = sessionStorage.getItem('userId');
         if (!userId) return;
-        socket.emit('join_user', userId);
+        socket.emit('join_user');
         const cachedGroupIds = JSON.parse(sessionStorage.getItem('myGroupIds') || '[]');
         if (cachedGroupIds.length) socket.emit('join_groups', cachedGroupIds);
     });

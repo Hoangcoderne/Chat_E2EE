@@ -22,9 +22,9 @@ export function base64ToArrayBuffer(base64) {
     return bytes.buffer;
 }
 
-/**
- * 1. Tách Password -> AuthKey (để login) + EncryptionKey (để giải mã PrivateKey)
- */
+// 1. Tách Password -> AuthKey (để login) + EncryptionKey (để giải mã PrivateKey)
+// Domain Separation: dùng salt khác nhau cho AuthKey và EncryptionKey
+// để compromise một key không ảnh hưởng key còn lại.
 export async function deriveKeysFromPassword(password, saltBuffer) {
     const enc = new TextEncoder();
 
@@ -32,8 +32,13 @@ export async function deriveKeysFromPassword(password, saltBuffer) {
         "raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveBits", "deriveKey"]
     );
 
+    // Domain-separated salts: nối salt gốc với context string
+    const saltBytes = new Uint8Array(saltBuffer);
+    const encSalt  = new Uint8Array([...saltBytes, ...enc.encode("encrypt")]);
+    const authSalt = new Uint8Array([...saltBytes, ...enc.encode("auth")]);
+
     const encryptionKey = await window.crypto.subtle.deriveKey(
-        { name: "PBKDF2", salt: saltBuffer, iterations: 100000, hash: "SHA-256" },
+        { name: "PBKDF2", salt: encSalt, iterations: 600000, hash: "SHA-256" },
         keyMaterial,
         { name: "AES-GCM", length: 256 },
         false,
@@ -41,7 +46,7 @@ export async function deriveKeysFromPassword(password, saltBuffer) {
     );
 
     const authKeyBits = await window.crypto.subtle.deriveBits(
-        { name: "PBKDF2", salt: saltBuffer, iterations: 100000, hash: "SHA-256" },
+        { name: "PBKDF2", salt: authSalt, iterations: 600000, hash: "SHA-256" },
         keyMaterial,
         256
     );

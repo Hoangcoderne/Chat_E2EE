@@ -32,9 +32,6 @@ const io = new Server(server, {
     },
 });
 
-// Online users set — chia sẻ toàn cục để chatController.getContacts() có thể đọc
-global.onlineUsers = new Map();
-
 // Đăng ký toàn bộ Socket.io event handlers
 registerSocketHandlers(io);
 

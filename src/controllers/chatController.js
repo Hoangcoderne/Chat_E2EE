@@ -1,8 +1,9 @@
 // src/controllers/chatController.js
-const mongoose = require('mongoose');
-const Message    = require('../models/Message');
-const User       = require('../models/User');
-const Friendship = require('../models/Friendship');
+const mongoose    = require('mongoose');
+const Message     = require('../models/Message');
+const User        = require('../models/User');
+const Friendship  = require('../models/Friendship');
+const onlineUsers = require('../utils/onlineUsers');
 
 // Lịch sử chat 
 exports.getChatHistory = async (req, res) => {
@@ -53,7 +54,7 @@ exports.getContacts = async (req, res) => {
             return {
                 _id:         friend._id,
                 username:    friend.username,
-                online:      global.onlineUsers ? global.onlineUsers.has(friend._id.toString()) : false,
+                online:      onlineUsers.isOnline(friend._id.toString()),
                 status:      f.status,
                 isBlocker:   (f.status === 'blocked' && isRequester),
                 unreadCount: unreadMap[friend._id.toString()] || 0

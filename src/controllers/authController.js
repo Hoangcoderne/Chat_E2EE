@@ -1,4 +1,5 @@
 // src/controllers/authController.js
+const crypto = require('crypto');
 const User = require('../models/User');
 const RefreshToken = require('../models/RefreshToken');
 const logger = require('../utils/logger');                        
@@ -69,7 +70,15 @@ exports.getSalt = async (req, res) => {
         if (!username) return res.status(400).json({ message: "Thiếu username" });
 
         const user = await User.findOne({ username });
-        if (!user) return res.status(404).json({ message: "Tài khoản không tồn tại" });
+
+        if (!user) {
+            // Fake salt: HMAC(username, SESSION_SECRET) → deterministic, không lộ user tồn tại hay không
+            const fakeSalt = crypto
+                .createHmac('sha256', process.env.SESSION_SECRET)
+                .update(username)
+                .digest('base64');
+            return res.json({ salt: fakeSalt });
+        }
 
         res.json({ salt: user.salt });
     } catch (err) {
@@ -86,13 +95,13 @@ exports.login = async (req, res) => {
         const user = await User.findOne({ username });
         if (!user) {
             logger.warn({ event: 'login_failed', reason: 'user_not_found', username });
-            return res.status(404).json({ message: "Tài khoản không tồn tại" });
+            return res.status(401).json({ message: "Tên đăng nhập hoặc mật khẩu không đúng" });
         }
 
         const isMatch = await verifyPassword(authKeyHash, user.authKeyHash);
         if (!isMatch) {
             logger.warn({ event: 'login_failed', reason: 'wrong_password', username });
-            return res.status(400).json({ message: "Mật khẩu không đúng" });
+            return res.status(401).json({ message: "Tên đăng nhập hoặc mật khẩu không đúng" });
         }
 
         const accessToken = signAccessToken({ userId: user._id, username: user.username });
