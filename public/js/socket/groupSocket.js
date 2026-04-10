@@ -12,6 +12,7 @@ import {
 import { renderGroupItem, openGroupChat, loadManageModal } from '../ui/groupUI.js';
 import { getGroupKey } from '../crypto/groupCrypto.js';
 import { decryptMessage } from '../crypto/key-manager.js';
+import { notifyNewMessage, clearNotification } from '../ui/notificationUI.js';
 
 export function registerGroupSocketHandlers(socket) {
 
@@ -21,6 +22,7 @@ export function registerGroupSocketHandlers(socket) {
 
         const previewEl = document.getElementById(`group-preview-${groupId}`);
         if (previewEl) previewEl.textContent = `${senderName}: tin nhắn mới`;
+        notifyNewMessage(senderName);
 
         if (state.currentGroupId !== groupId) {
             const badge = document.getElementById(`unread-group-${groupId}`);

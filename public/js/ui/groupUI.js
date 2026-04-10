@@ -8,6 +8,7 @@ import { cancelReply }    from './messageUI.js';
 import { clearGroupPreview } from './contactUI.js';
 import { getGroupKey, encryptGroupKeyForMember } from '../crypto/groupCrypto.js';
 import { loadGroupHistory } from '../api.js';
+import { clearNotification } from './notificationUI.js';
 
 let _socket = null;
 export function setSocket(s) { _socket = s; }
@@ -49,6 +50,8 @@ export function renderGroupItem(group) {
 export async function openGroupChat(group) {
     cancelReply();
     state.currentGroupId = group._id;
+    clearNotification();
+
     state.currentChat    = { partnerId: null, partnerPublicKey: null, partnerSigningPublicKey: null, sharedSecret: null };
 
     document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));

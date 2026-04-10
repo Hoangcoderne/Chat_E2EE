@@ -22,6 +22,7 @@ import {
 } from '../crypto/key-manager.js';
 import { loadChatHistory } from '../api.js';
 import { startHandshake }  from '../actions.js';
+import { notifyNewMessage, clearNotification } from '../ui/notificationUI.js';
 
 export function registerDMSocketHandlers(socket) {
 
@@ -63,6 +64,7 @@ export function registerDMSocketHandlers(socket) {
             document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
             document.querySelector(`.contact-item[data-id="${userId}"]`)?.classList.add('active');
 
+            clearNotification();
             await loadChatHistory(socket);
             resetUnreadBadge(userId);
             clearContactPreview(userId);
@@ -85,6 +87,9 @@ export function registerDMSocketHandlers(socket) {
     // receive_message: nhận tin DM
     socket.on('receive_message', async (payload) => {
         updateContactPreview(payload.senderId);
+        const contactEl   = document.querySelector(`.contact-item[data-id="${payload.senderId}"]`);
+        const senderName  = contactEl?.dataset.username || 'Tin nhắn mới';
+        notifyNewMessage(senderName);
         if (payload.senderId === state.currentChat.partnerId) {
             try {
                 clearEmptyState();
