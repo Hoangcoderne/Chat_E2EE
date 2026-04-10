@@ -8,6 +8,7 @@ import {
     appendMessage, appendGroupSystemMessage,
     clearEmptyState, renderReactions,
     renderSeenListFromHistory, updateLastMsgSeenList,
+    showTypingIndicator, hideTypingIndicator,
 } from '../ui/messageUI.js';
 import { renderGroupItem, openGroupChat, loadManageModal } from '../ui/groupUI.js';
 import { getGroupKey } from '../crypto/groupCrypto.js';
@@ -22,15 +23,16 @@ export function registerGroupSocketHandlers(socket) {
 
         const previewEl = document.getElementById(`group-preview-${groupId}`);
         if (previewEl) previewEl.textContent = `${senderName}: tin nhắn mới`;
-        notifyNewMessage(senderName);
 
         if (state.currentGroupId !== groupId) {
+            // Tin nhắn chờ — phát âm thanh + badge
             const badge = document.getElementById(`unread-group-${groupId}`);
             if (badge) {
                 const cur = parseInt(badge.textContent) || 0;
                 badge.textContent = cur + 1 > 99 ? '99+' : cur + 1;
                 badge.classList.remove('hidden');
             }
+            notifyNewMessage(senderName);
             return;
         }
 
@@ -46,7 +48,10 @@ export function registerGroupSocketHandlers(socket) {
                 label.textContent = senderName;
                 wrapper.insertBefore(label, wrapper.firstChild);
             }
-            socket.emit('mark_group_read', { groupId });
+            // Chỉ mark_group_read khi tab đang được focus
+            if (!document.hidden) {
+                socket.emit('mark_group_read', { groupId });
+            }
         } catch (_) {
             appendMessage('[Lỗi giải mã]', 'system');
         }
@@ -143,5 +148,29 @@ export function registerGroupSocketHandlers(socket) {
             });
             if (!dom.modalManageGroup.classList.contains('hidden')) loadManageModal(groupId);
         }
+    });
+
+    // Group typing indicator
+    const groupTypers = new Map(); // Map<userId, username>
+    let groupTypingTimer = null;
+
+    function updateGroupTypingUI() {
+        if (groupTypers.size === 0) { hideTypingIndicator(); return; }
+        const names = [...groupTypers.values()];
+        const label = names.length === 1
+            ? names[0]
+            : names.slice(0, 2).join(', ') + (names.length > 2 ? ` và ${names.length - 2} người khác` : '');
+        showTypingIndicator(label);
+    }
+
+    socket.on('group_user_typing', ({ userId, username }) => {
+        if (state.currentGroupId === null) return;
+        groupTypers.set(userId, username);
+        updateGroupTypingUI();
+    });
+
+    socket.on('group_user_stop_typing', ({ userId }) => {
+        groupTypers.delete(userId);
+        updateGroupTypingUI();
     });
 }

@@ -8,6 +8,7 @@ import {
     appendMessage, clearEmptyState,
     renderReactions, cancelReply,
     updateLastMsgSeenList,
+    showTypingIndicator, hideTypingIndicator,
 } from '../ui/messageUI.js';
 import {
     renderContactItem, updateRequestUI,
@@ -89,9 +90,6 @@ export function registerDMSocketHandlers(socket) {
     // receive_message: nhận tin DM
     socket.on('receive_message', async (payload) => {
         updateContactPreview(payload.senderId);
-        const contactEl   = document.querySelector(`.contact-item[data-id="${payload.senderId}"]`);
-        const senderName  = contactEl?.dataset.username || 'Tin nhắn mới';
-        notifyNewMessage(senderName);
         if (payload.senderId === state.currentChat.partnerId) {
             try {
                 clearEmptyState();
@@ -105,12 +103,19 @@ export function registerDMSocketHandlers(socket) {
                 }
                 const replyTo = await decryptReplyTo(payload.replyTo, state.currentChat.sharedSecret);
                 appendMessage(decryptedText, 'received', signatureValid, payload.timestamp, payload.messageId, false, [], null, replyTo);
-                socket.emit('mark_read', { partnerId: payload.senderId });
+                // Chỉ mark_read khi tab đang được focus
+                if (!document.hidden) {
+                    socket.emit('mark_read', { partnerId: payload.senderId });
+                }
             } catch (_) {
                 appendMessage('[Lỗi giải mã]', 'received', false);
             }
         } else {
+            // Tin nhắn chờ — phát âm thanh + badge
             incrementUnreadBadge(payload.senderId);
+            const contactEl  = document.querySelector(`.contact-item[data-id="${payload.senderId}"]`);
+            const senderName = contactEl?.dataset.username || 'Tin nhắn mới';
+            notifyNewMessage(senderName);
         }
     });
 
@@ -141,6 +146,28 @@ export function registerDMSocketHandlers(socket) {
         document.querySelectorAll('.msg-wrapper .msg-status').forEach(el => {
             el.textContent = '✓✓'; el.classList.add('read');
         });
+    });
+
+    // Khi user quay lại tab → mark_read nếu đang trong đoạn chat
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && state.currentChat.partnerId) {
+            socket.emit('mark_read', { partnerId: state.currentChat.partnerId });
+        }
+        if (!document.hidden && state.currentGroupId) {
+            socket.emit('mark_group_read', { groupId: state.currentGroupId });
+        }
+    });
+
+    // Typing indicator (DM)
+    socket.on('user_typing', ({ userId }) => {
+        if (state.currentChat.partnerId !== userId) return;
+        const name = dom.partnerName.innerText || 'Đối phương';
+        showTypingIndicator(name);
+    });
+
+    socket.on('user_stop_typing', ({ userId }) => {
+        if (state.currentChat.partnerId !== userId) return;
+        hideTypingIndicator();
     });
 
     // user_status_change

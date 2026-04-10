@@ -369,3 +369,33 @@ export function renderSeenListFromHistory(wrapper, readBy, senderId) {
         .map(u => u.username || u.toString());
     renderSeenList(seenList, viewers);
 }
+
+// Typing indicator
+export function showTypingIndicator(name) {
+    let el = document.getElementById('typing-indicator');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'typing-indicator';
+        el.className = 'typing-indicator';
+        dom.messagesList.appendChild(el);
+    }
+    el.innerHTML = '';
+
+    const text = document.createElement('span');
+    text.className = 'typing-text';
+    text.textContent = `${name} đang soạn tin`;
+
+    const dots = document.createElement('span');
+    dots.className = 'typing-dots';
+    dots.innerHTML = '<span></span><span></span><span></span>';
+
+    el.appendChild(text);
+    el.appendChild(dots);
+
+    dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
+}
+
+export function hideTypingIndicator() {
+    document.getElementById('typing-indicator')?.remove();
+}
+

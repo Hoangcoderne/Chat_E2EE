@@ -98,6 +98,8 @@ export function renderContactItem(user) {
         badge.textContent = user.unreadCount > 99 ? '99+' : user.unreadCount;
         badge.classList.remove('hidden');
         state.unreadCounts[user._id] = user.unreadCount;
+        const previewEl = info.querySelector('.last-message');
+        if (previewEl) previewEl.textContent = 'Có tin nhắn mới';
     }
 
     // Options button

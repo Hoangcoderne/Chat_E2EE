@@ -69,6 +69,15 @@ function goBackToSidebar() {
     dom.chatArea.classList.remove('mobile-active');
     document.querySelector('.sidebar').classList.remove('mobile-hidden');
     dom.btnBack.classList.add('hidden');
+
+    // Mobile: quay về sidebar = không ở trong đoạn chat nào cả
+    state.currentChat = {
+        partnerId:              null,
+        partnerPublicKey:       null,
+        partnerSigningPublicKey: null,
+        sharedSecret:           null,
+    };
+    state.currentGroupId = null;
 }
 
 window.addEventListener('popstate', () => {
@@ -83,13 +92,43 @@ dom.btnLogout.addEventListener('click', logout);
 
 // Send message (DM hoặc Group)
 dom.btnSend.addEventListener('click', () => {
+    stopTypingNow();
     if (state.currentGroupId) sendGroupMessage();
     else                      sendMessage();
 });
 dom.msgInput.addEventListener('keypress', (e) => {
     if (e.key !== 'Enter') return;
+    stopTypingNow();
     if (state.currentGroupId) sendGroupMessage();
     else                      sendMessage();
+});
+
+// Typing indicator — debounce emit
+let typingTimer = null;
+let isTyping    = false;
+
+function stopTypingNow() {
+    if (!isTyping) return;
+    isTyping = false;
+    clearTimeout(typingTimer);
+    if (state.currentGroupId) {
+        socket.emit('stop_group_typing', { groupId: state.currentGroupId });
+    } else if (state.currentChat.partnerId) {
+        socket.emit('stop_typing', { recipientId: state.currentChat.partnerId });
+    }
+}
+
+dom.msgInput.addEventListener('input', () => {
+    if (!isTyping) {
+        isTyping = true;
+        if (state.currentGroupId) {
+            socket.emit('group_typing', { groupId: state.currentGroupId });
+        } else if (state.currentChat.partnerId) {
+            socket.emit('typing', { recipientId: state.currentChat.partnerId });
+        }
+    }
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(stopTypingNow, 2000);
 });
 
 // Back (mobile)

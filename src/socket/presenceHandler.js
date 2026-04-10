@@ -38,4 +38,29 @@ module.exports = function presenceHandler(io, socket) {
             logger.info({ event: 'user_offline', userId: socket.userId });
         }
     });
+
+    // typing / stop_typing: relay trạng thái đang soạn tin (DM)
+    socket.on('typing', ({ recipientId }) => {
+        if (!socket.userId || !recipientId) return;
+        socket.to(recipientId).emit('user_typing', { userId: socket.userId });
+    });
+
+    socket.on('stop_typing', ({ recipientId }) => {
+        if (!socket.userId || !recipientId) return;
+        socket.to(recipientId).emit('user_stop_typing', { userId: socket.userId });
+    });
+
+    // group_typing / stop_group_typing: relay trạng thái đang soạn tin (Group)
+    socket.on('group_typing', ({ groupId }) => {
+        if (!socket.userId || !groupId) return;
+        socket.to(groupId).emit('group_user_typing', {
+            userId:   socket.userId,
+            username: socket.username,
+        });
+    });
+
+    socket.on('stop_group_typing', ({ groupId }) => {
+        if (!socket.userId || !groupId) return;
+        socket.to(groupId).emit('group_user_stop_typing', { userId: socket.userId });
+    });
 };
