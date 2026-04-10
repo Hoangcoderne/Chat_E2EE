@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { decryptMessage } from './crypto/key-manager.js';
 
-// ── authFetch: tự động refresh token khi hết hạn ─────────────────────────
+// authFetch: tự động refresh token khi hết hạn
 export async function authFetch(url, options = {}, _isRetry = false) {
     const token = localStorage.getItem('accessToken');
 
@@ -35,7 +35,7 @@ export async function authFetch(url, options = {}, _isRetry = false) {
     return res;
 }
 
-// ── tryRefreshToken: gọi /api/auth/refresh (cookie tự động gửi kèm) ───────
+// tryRefreshToken: gọi /api/auth/refresh (cookie tự động gửi kèm)
 export async function tryRefreshToken() {
     try {
         const res = await fetch('/api/auth/refresh', {
@@ -52,7 +52,7 @@ export async function tryRefreshToken() {
     }
 }
 
-// ── logout: xóa key + session → về login ─────────────────────────────────
+// logout: xóa key + session → về login
 export async function logout() {
     try {
         fetch('/api/auth/logout', {
@@ -82,7 +82,7 @@ export async function logout() {
     }
 }
 
-// ── loadKeyFromDB: đọc CryptoKey từ IndexedDB ─────────────────────────────
+// loadKeyFromDB: đọc CryptoKey từ IndexedDB
 export function loadKeyFromDB(id = 'my-private-key') {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open('SecureChatDB', 1);
@@ -102,7 +102,7 @@ export function loadKeyFromDB(id = 'my-private-key') {
     });
 }
 
-// ── formatTime: hiển thị thời gian theo ngữ cảnh ─────────────────────────
+// formatTime: hiển thị thời gian theo ngữ cảnh
 export function formatTime(date) {
     const d         = new Date(date);
     const now       = new Date();
@@ -116,7 +116,7 @@ export function formatTime(date) {
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + timeStr;
 }
 
-// ── decryptReplyTo: giải mã replyTo object ────────────────────────────────
+// decryptReplyTo: giải mã replyTo object
 export async function decryptReplyTo(replyTo, key) {
     if (!replyTo?.encryptedContent || !key) return null;
     try {

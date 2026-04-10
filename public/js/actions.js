@@ -1,6 +1,5 @@
 // public/js/actions.js
 // Các action do user trigger: gửi tin, xóa tin, reaction, forward, handshake.
-// Tách khỏi UI để dễ test và tái sử dụng giữa DM và Group.
 
 import { state }      from './state.js';
 import { dom }        from './ui/dom.js';
@@ -14,16 +13,14 @@ import { decryptReplyTo } from './utils.js';
 let _socket = null;
 export function setSocket(s) { _socket = s; }
 
-// ── startHandshake: emit request_public_key tới server ────────────────────
+// startHandshake: emit request_public_key tới server
 export function startHandshake(targetUsername) {
     if (!targetUsername) return;
     if (targetUsername === state.myIdentity.username) return alert('Không thể chat với mình');
     _socket?.emit('request_public_key', { username: targetUsername });
 }
 
-// ════════════════════════════════════════════════════════════════════════════
 // DM: sendMessage
-// ════════════════════════════════════════════════════════════════════════════
 export async function sendMessage() {
     const text = dom.msgInput.value.trim();
     if (!text || !state.currentChat.sharedSecret) return;
@@ -62,9 +59,7 @@ export async function sendMessage() {
     }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
 // Group: sendGroupMessage
-// ════════════════════════════════════════════════════════════════════════════
 export async function sendGroupMessage() {
     const text = dom.msgInput.value.trim();
     if (!text || !state.currentGroupId) return;
@@ -106,9 +101,7 @@ export async function sendGroupMessage() {
     }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
 // Delete message
-// ════════════════════════════════════════════════════════════════════════════
 export async function doDeleteMessage(msgId, wrapper) {
     try {
         const groupId  = wrapper.dataset.groupId || null;
@@ -129,9 +122,7 @@ export async function doDeleteMessage(msgId, wrapper) {
     }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
 // Toggle reaction
-// ════════════════════════════════════════════════════════════════════════════
 export async function doToggleReaction(msgId, emoji, wrapper) {
     try {
         const isGroupMsg = !!state.currentGroupId;
@@ -154,9 +145,7 @@ export async function doToggleReaction(msgId, emoji, wrapper) {
     }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
 // Forward
-// ════════════════════════════════════════════════════════════════════════════
 export async function doForwardMessage(text, targetId, targetUsername) {
     if (state.currentChat.partnerId === targetId && state.currentChat.sharedSecret) {
         const sig = await signMessage(text, state.myIdentity.signingPrivateKey);

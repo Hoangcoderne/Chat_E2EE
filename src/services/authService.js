@@ -6,7 +6,7 @@ const jwt          = require('jsonwebtoken');
 const RefreshToken = require('../models/RefreshToken');
 const { hashToken, generateRefreshToken, hashPassword } = require('../utils/crypto');
 
-// ── Token TTLs ────────────────────────────────────────────────────────────
+// Token TTLs
 const ACCESS_TOKEN_TTL  = '15m';
 const REFRESH_TOKEN_TTL = 24 * 60 * 60 * 1000; // 24 giờ tính bằng ms
 

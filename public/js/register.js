@@ -11,13 +11,13 @@ import {
     arrayBufferToBase64
 } from './crypto/key-manager.js';
 
-// ── DOM ──
+// DOM
 const form       = document.getElementById('register-form');
 const btnSubmit  = document.getElementById('btn-submit');
 const errorMsg   = document.getElementById('error-msg');
 const successMsg = document.getElementById('success-msg');
 
-// ── Lưu payload giữa 2 phase (generate → confirm → call API) ──
+// Lưu payload giữa 2 phase (generate → confirm → call API)
 // Không dùng sessionStorage vì chứa dữ liệu nhạy cảm (keys chưa mã hoá)
 let pendingPayload = null;
 
@@ -36,7 +36,7 @@ function validatePasswordStrength(password) {
     return errors;
 }
 
-// ── Strength bar cập nhật real-time ──
+// Strength bar cập nhật real-time
 const passwordInput = document.getElementById('password');
 passwordInput.addEventListener('input', () => {
     const val    = passwordInput.value;
@@ -68,7 +68,7 @@ passwordInput.addEventListener('input', () => {
     }
 });
 
-// ── Validate username format client-side ──
+// Validate username format client-side
 function validateUsernameFormat(username) {
     const errors = [];
     if (username.length < 3 || username.length > 20)
@@ -105,14 +105,14 @@ form.addEventListener('submit', async (e) => {
     const password        = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirm-password').value;
 
-    // ── Validate username format ──
+    // Validate username format
     const unErrors = validateUsernameFormat(username);
     if (unErrors.length > 0) {
         showError('Tên đăng nhập không hợp lệ:\n• ' + unErrors.join('\n• '));
         return;
     }
 
-    // ── Validate password strength ──
+    // Validate password strength
     const pwErrors = validatePasswordStrength(password);
     if (pwErrors.length > 0) {
         showError('Mật khẩu chưa đủ mạnh:\n• ' + pwErrors.join('\n• '));
@@ -124,7 +124,7 @@ form.addEventListener('submit', async (e) => {
         return;
     }
 
-    // ── Kiểm tra username đã tồn tại chưa TRƯỚC khi generate keys ──
+    // Kiểm tra username đã tồn tại chưa TRƯỚC khi generate keys
     setLoading(true, 'Đang kiểm tra tên đăng nhập...');
     try {
         const checkRes = await fetch(`/api/auth/salt?username=${encodeURIComponent(username)}`);
@@ -324,7 +324,7 @@ function showRecoveryStep(recoveryDisplay) {
     // Chèn panel vào container
     form.parentNode.insertBefore(panel, form);
 
-    // ── Event listeners ──
+    // Event listeners
 
     // Copy
     document.getElementById('btn-copy-recovery').addEventListener('click', () => {
@@ -360,7 +360,7 @@ function showRecoveryStep(recoveryDisplay) {
     });
 }
 
-// ── Sau khi API tạo tài khoản thành công ──
+// Sau khi API tạo tài khoản thành công
 function showCreateSuccess() {
     const panel = document.getElementById('recovery-panel');
     if (panel) {
@@ -385,7 +385,7 @@ function showCreateSuccess() {
     }
 }
 
-// ── Helpers ──
+// Helpers
 function showError(msg) {
     errorMsg.innerText       = msg;
     errorMsg.style.display   = 'block';

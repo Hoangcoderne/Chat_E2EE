@@ -14,13 +14,13 @@ const logger       = require('../utils/logger');
  */
 module.exports = function groupHandler(io, socket) {
 
-    // ── join_groups: tham gia các socket room của nhóm ────────────────────
+    // join_groups: tham gia các socket room của nhóm
     socket.on('join_groups', (groupIds) => {
         if (!Array.isArray(groupIds)) return;
         groupIds.forEach(gid => socket.join('group:' + gid));
     });
 
-    // ── send_group_message: relay tin nhắn nhóm E2EE ─────────────────────
+    // send_group_message: relay tin nhắn nhóm E2EE
     socket.on('send_group_message', async ({ groupId, encryptedContent, iv, signature, replyTo }) => {
         try {
             if (!socket.userId)
@@ -67,7 +67,7 @@ module.exports = function groupHandler(io, socket) {
         }
     });
 
-    // ── mark_group_read: đánh dấu đã đọc toàn bộ tin trong nhóm ──────────
+    // mark_group_read: đánh dấu đã đọc toàn bộ tin trong nhóm
     socket.on('mark_group_read', async ({ groupId }) => {
         try {
             if (!socket.userId) return;
@@ -88,7 +88,7 @@ module.exports = function groupHandler(io, socket) {
         }
     });
 
-    // ── broadcast_group_member_added: admin thêm thành viên ───────────────
+    // broadcast_group_member_added: admin thêm thành viên
     socket.on('broadcast_group_member_added', async ({ groupId, newMemberIds, groupName }) => {
         if (!socket.userId) return;
         try {
@@ -131,27 +131,27 @@ module.exports = function groupHandler(io, socket) {
         }
     });
 
-    // ── broadcast_group_member_removed: admin xoá thành viên ─────────────
+    // broadcast_group_member_removed: admin xoá thành viên
     socket.on('broadcast_group_member_removed', ({ groupId, removedUserId, removedName }) => {
         if (!socket.userId) return;
         io.to('group:' + groupId).emit('group_member_removed', { groupId, removedUserId, removedName });
         io.to(removedUserId).emit('group_kicked', { groupId });
     });
 
-    // ── broadcast_delete_group_message: xoá tin nhắn nhóm real-time ───────
+    // broadcast_delete_group_message: xoá tin nhắn nhóm real-time
     socket.on('broadcast_delete_group_message', ({ groupId, messageId }) => {
         if (!socket.userId) return;
         // Dùng socket.to() (không bao gồm sender — sender đã tự remove khỏi UI rồi)
         socket.to('group:' + groupId).emit('message_deleted', { messageId });
     });
 
-    // ── broadcast_group_reaction: cập nhật reaction nhóm real-time ────────
+    // broadcast_group_reaction: cập nhật reaction nhóm real-time
     socket.on('broadcast_group_reaction', ({ groupId, messageId, reactions }) => {
         if (!socket.userId) return;
         socket.to('group:' + groupId).emit('reaction_updated', { messageId, reactions });
     });
 
-    // ── broadcast_group_left: user tự rời nhóm ────────────────────────────
+    // broadcast_group_left: user tự rời nhóm
     socket.on('broadcast_group_left', ({ groupId, leavingName }) => {
         if (!socket.userId) return;
         socket.to('group:' + groupId).emit('group_member_removed', {

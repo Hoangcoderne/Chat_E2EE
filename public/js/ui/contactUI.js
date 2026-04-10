@@ -8,9 +8,7 @@ import { authFetch } from '../utils.js';
 let _socket = null; // được inject từ app.js
 export function setSocket(s) { _socket = s; }
 
-// ════════════════════════════════════════════════════════════════════════════
 // Unread badges
-// ════════════════════════════════════════════════════════════════════════════
 export function setUnreadBadge(userId, count) {
     state.unreadCounts[userId] = count;
     const badge = document.getElementById(`unread-${userId}`);
@@ -25,7 +23,7 @@ export function setUnreadBadge(userId, count) {
 export const incrementUnreadBadge = (id) => setUnreadBadge(id, (state.unreadCounts[id] || 0) + 1);
 export const resetUnreadBadge     = (id) => setUnreadBadge(id, 0);
 
-// ── Preview text ──────────────────────────────────────────────────────────
+// Preview text
 export function updateContactPreview(userId) {
     const el = document.getElementById(`preview-${userId}`);
     if (el) el.textContent = 'Có tin nhắn mới';
@@ -39,7 +37,7 @@ export function clearGroupPreview(groupId) {
     if (el) el.textContent = '';
 }
 
-// ── Header status ─────────────────────────────────────────────────────────
+// Header status
 export function updateHeaderStatus(userId) {
     if (state.currentChat.partnerId !== userId) return;
     const dot = document.getElementById(`status-${userId}`);
@@ -48,9 +46,7 @@ export function updateHeaderStatus(userId) {
     dom.partnerStatus.classList.toggle('online', online);
 }
 
-// ════════════════════════════════════════════════════════════════════════════
 // renderContactItem
-// ════════════════════════════════════════════════════════════════════════════
 export function renderContactItem(user) {
     if (document.querySelector(`.contact-item[data-id="${user._id}"]`)) return;
 
@@ -157,9 +153,7 @@ export function renderContactItem(user) {
     dom.contactsList.appendChild(li);
 }
 
-// ════════════════════════════════════════════════════════════════════════════
 // Notification popup
-// ════════════════════════════════════════════════════════════════════════════
 export function updateRequestUI() {
     const total = state.friendRequests.length + state.notifications.length;
     if (total > 0) {
@@ -201,9 +195,7 @@ export function updateRequestUI() {
     });
 }
 
-// ════════════════════════════════════════════════════════════════════════════
 // Context menu (⋮)
-// ════════════════════════════════════════════════════════════════════════════
 export function toggleMenu(e, btn, id) {
     e.stopPropagation(); e.preventDefault();
     const menu   = document.getElementById(`menu-${id}`);
@@ -221,7 +213,7 @@ export function toggleMenu(e, btn, id) {
     menu.style.top = `${top}px`; menu.style.left = `${left}px`;
 }
 
-// ── Block / Unblock / Unfriend ────────────────────────────────────────────
+// Block / Unblock / Unfriend
 export async function handleUnfriend(e, targetId) {
     e.stopPropagation();
     if (!confirm('Bạn chắc chắn muốn hủy kết bạn?')) return;

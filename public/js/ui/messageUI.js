@@ -7,9 +7,7 @@ import { dom }       from './dom.js';
 import { authFetch } from '../utils.js';
 import { formatTime } from '../utils.js';
 
-// ════════════════════════════════════════════════════════════════════════════
 // appendMessage — render một tin nhắn vào danh sách
-// ════════════════════════════════════════════════════════════════════════════
 export function appendMessage(
     text, type,
     signatureValid = null,
@@ -28,7 +26,7 @@ export function appendMessage(
     if (groupId) wrapper.dataset.groupId = groupId;
     if (text && type !== 'system') wrapper.dataset.plaintext = text;
 
-    // ── Bubble ──
+    // Bubble
     const div = document.createElement('div');
     if (signatureValid === false) {
         div.classList.add('message', 'msg-received');
@@ -76,7 +74,7 @@ export function appendMessage(
         div.appendChild(document.createTextNode(text));
     }
 
-    // ── Action buttons (chỉ cho tin thường) ──
+    // Action buttons (chỉ cho tin thường)
     if (type !== 'system' && signatureValid !== false) {
         const actions = document.createElement('div');
         actions.className = `msg-actions ${type === 'sent' ? 'actions-sent' : 'actions-received'}`;
@@ -105,13 +103,13 @@ export function appendMessage(
         wrapper.appendChild(div);
     }
 
-    // ── Reaction bar ──
+    // Reaction bar
     const reactionBar = document.createElement('div');
     reactionBar.className = `reaction-bar ${type === 'sent' ? 'rbar-sent' : 'rbar-received'}`;
     renderReactions(reactionBar, reactions);
     wrapper.appendChild(reactionBar);
 
-    // ── Meta (timestamp + status) ──
+    // Meta (timestamp + status)
     if (type !== 'system') {
         const meta = document.createElement('div');
         meta.className = `msg-meta ${type === 'sent' ? 'meta-sent' : 'meta-received'}`;
@@ -141,12 +139,12 @@ export function appendMessage(
     return wrapper;
 }
 
-// ── clearEmptyState ───────────────────────────────────────────────────────
+// clearEmptyState
 export function clearEmptyState() {
     dom.messagesList.querySelectorAll('.empty-state-msg').forEach(el => el.remove());
 }
 
-// ── appendGroupSystemMessage ──────────────────────────────────────────────
+// appendGroupSystemMessage
 export function appendGroupSystemMessage(text) {
     clearEmptyState();
     const div = document.createElement('div');
@@ -156,9 +154,7 @@ export function appendGroupSystemMessage(text) {
     dom.messagesList.scrollTop = dom.messagesList.scrollHeight;
 }
 
-// ════════════════════════════════════════════════════════════════════════════
 // Reactions
-// ════════════════════════════════════════════════════════════════════════════
 export function renderReactions(bar, reactions) {
     bar.innerHTML = '';
     if (!reactions || reactions.length === 0) return;
@@ -177,9 +173,7 @@ export function renderReactions(bar, reactions) {
     });
 }
 
-// ════════════════════════════════════════════════════════════════════════════
 // Emoji picker
-// ════════════════════════════════════════════════════════════════════════════
 const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡'];
 
 export function showEmojiPicker(e, wrapper) {
@@ -220,7 +214,7 @@ export function showEmojiPicker(e, wrapper) {
     picker.style.visibility = '';
 }
 
-// ── Message options menu (⋯) ──────────────────────────────────────────────
+// Message options menu (⋯)
 export function showMsgMenu(e, wrapper, type) {
     closeAllPopups();
     const msgId    = wrapper.dataset.msgId;
@@ -268,9 +262,7 @@ export function closeAllPopups() {
     document.getElementById('_forward_modal')?.remove();
 }
 
-// ════════════════════════════════════════════════════════════════════════════
 // Reply bar
-// ════════════════════════════════════════════════════════════════════════════
 export function setReply(wrapper) {
     const plaintext = wrapper.dataset.plaintext;
     const msgId     = wrapper.dataset.msgId;
@@ -317,9 +309,7 @@ export function cancelReply() {
     if (bar) bar.classList.add('hidden');
 }
 
-// ════════════════════════════════════════════════════════════════════════════
 // Seen list (group)
-// ════════════════════════════════════════════════════════════════════════════
 export function updateLastMsgSeenList(username) {
     const sentWrappers = [...dom.messagesList.querySelectorAll('.msg-wrapper.wrapper-sent')];
     if (!sentWrappers.length) return;

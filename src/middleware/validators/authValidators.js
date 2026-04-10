@@ -4,7 +4,7 @@
 const { body } = require('express-validator');
 const { handleValidationErrors, validateUsername, validateRecoveryKey } = require('./common');
 
-// ── Atomic validators ─────────────────────────────────────────────────────
+// Atomic validators
 
 /**
  * authKeyHash: PBKDF2-derived Base64 key gửi thay cho password thật.
@@ -24,7 +24,7 @@ const validateSalt = body('salt')
     .isString().withMessage('Salt phải là chuỗi')
     .isLength({ min: 10, max: 200 }).withMessage('Salt không hợp lệ');
 
-// ── Validation chains cho từng route ─────────────────────────────────────
+// Validation chains cho từng route
 
 /** POST /api/auth/login */
 const loginValidation = [

@@ -10,7 +10,7 @@ const logger = require('../utils/logger');
  */
 module.exports = function presenceHandler(io, socket) {
 
-    // ── join_user: user xác nhận danh tính sau khi kết nối ────────────────
+    // join_user: user xác nhận danh tính sau khi kết nối
     socket.on('join_user', async (userId) => {
         try {
             socket.join(userId);
@@ -33,12 +33,12 @@ module.exports = function presenceHandler(io, socket) {
         }
     });
 
-    // ── disconnect: cleanup khi socket ngắt ───────────────────────────────
+    // disconnect: cleanup khi socket ngắt
     socket.on('disconnect', () => {
         if (socket.userId) {
             const sockets = global.onlineUsers.get(socket.userId);
             
-            // DEBUG — xóa sau khi fix xong
+            // xóa sau khi fix xong
             console.log(`[DISCONNECT] userId=${socket.userId} socketId=${socket.id}`);
             console.log(`[DISCONNECT] sockets in Map:`, sockets ? [...sockets] : 'không có');
 

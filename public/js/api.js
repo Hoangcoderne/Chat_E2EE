@@ -1,6 +1,5 @@
 // public/js/api.js
 // Tập trung tất cả API calls (HTTP fetch) theo domain.
-// Socket events KHÔNG nằm ở đây — xem socket/dmSocket.js và socket/groupSocket.js.
 
 import { state }      from './state.js';
 import { authFetch }  from './utils.js';
@@ -13,7 +12,7 @@ import { decryptMessage, verifySignature }       from './crypto/key-manager.js';
 import { decryptReplyTo }               from './utils.js';
 import { getGroupKey }                  from './crypto/groupCrypto.js';
 
-// ── Contacts ──────────────────────────────────────────────────────────────
+// Contacts
 export async function loadContacts() {
     try {
         const res = await authFetch('/api/chat/contacts');
@@ -26,7 +25,7 @@ export async function loadContacts() {
     }
 }
 
-// ── DM chat history ───────────────────────────────────────────────────────
+// DM chat history
 export async function loadChatHistory(socket) {
     const { userId }               = state.myIdentity;
     const { partnerId, sharedSecret, partnerSigningPublicKey } = state.currentChat;
@@ -78,7 +77,7 @@ export async function loadChatHistory(socket) {
     }
 }
 
-// ── Friend requests ───────────────────────────────────────────────────────
+// Friend requests
 export async function loadFriendRequests(updateRequestUI) {
     try {
         const res = await authFetch('/api/chat/requests');
@@ -91,7 +90,7 @@ export async function loadFriendRequests(updateRequestUI) {
     } catch (err) { console.error(err); }
 }
 
-// ── Notifications ─────────────────────────────────────────────────────────
+// Notifications
 export async function loadNotifications(updateRequestUI) {
     try {
         const res = await authFetch('/api/chat/notifications');
@@ -101,7 +100,7 @@ export async function loadNotifications(updateRequestUI) {
     } catch (err) { console.error(err); }
 }
 
-// ── Groups ────────────────────────────────────────────────────────────────
+// Groups
 export async function loadGroups(socket) {
     try {
         const res = await authFetch('/api/groups');
@@ -118,7 +117,7 @@ export async function loadGroups(socket) {
     }
 }
 
-// ── Group history ─────────────────────────────────────────────────────────
+// Group history
 export async function loadGroupHistory(groupId, socket) {
     try {
         const res = await authFetch(`/api/groups/${groupId}/history`);

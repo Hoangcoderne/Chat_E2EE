@@ -15,7 +15,7 @@ import { decryptMessage } from '../crypto/key-manager.js';
 
 export function registerGroupSocketHandlers(socket) {
 
-    // ── receive_group_message ─────────────────────────────────────────────
+    // receive_group_message
     socket.on('receive_group_message', async (payload) => {
         const { groupId, senderId, senderName, encryptedContent, iv, reactions, timestamp, messageId, replyTo } = payload;
 
@@ -50,7 +50,7 @@ export function registerGroupSocketHandlers(socket) {
         }
     });
 
-    // ── group_message_sent_sync: multi-device sync ────────────────────────
+    // group_message_sent_sync: multi-device sync
     socket.on('group_message_sent_sync', async (payload) => {
         if (payload.senderSocketId === socket.id) {
             const tempEl = dom.messagesList.querySelector('[data-temp="true"]');
@@ -64,7 +64,7 @@ export function registerGroupSocketHandlers(socket) {
         }
     });
 
-    // ── group_invited: được thêm vào nhóm mới ────────────────────────────
+    // group_invited: được thêm vào nhóm mới
     socket.on('group_invited', async ({ groupId, groupName, memberCount }) => {
         socket.emit('join_groups', [groupId]);
 
@@ -90,13 +90,13 @@ export function registerGroupSocketHandlers(socket) {
         }
     });
 
-    // ── group_read_update: member khác đã đọc ─────────────────────────────
+    // group_read_update: member khác đã đọc
     socket.on('group_read_update', ({ groupId, userId, username }) => {
         if (state.currentGroupId !== groupId) return;
         updateLastMsgSeenList(username);
     });
 
-    // ── group_kicked: bị xóa khỏi nhóm ───────────────────────────────────
+    // group_kicked: bị xóa khỏi nhóm
     socket.on('group_kicked', ({ groupId }) => {
         document.querySelector(`.group-item[data-group-id="${groupId}"]`)?.remove();
         if (state.currentGroupId === groupId) {
@@ -107,7 +107,7 @@ export function registerGroupSocketHandlers(socket) {
         }
     });
 
-    // ── group_member_added: thành viên mới tham gia ───────────────────────
+    // group_member_added: thành viên mới tham gia─
     socket.on('group_member_added', ({ groupId, memberCount, newMemberNames }) => {
         const previewEl = document.getElementById(`group-preview-${groupId}`);
         if (previewEl && memberCount) previewEl.textContent = `${memberCount} thành viên`;
@@ -119,7 +119,7 @@ export function registerGroupSocketHandlers(socket) {
         }
     });
 
-    // ── group_member_removed: thành viên rời/bị xóa ──────────────────────
+    // group_member_removed: thành viên rời/bị xóa
     socket.on('group_member_removed', ({ groupId, removedUserId, removedName, leavingName }) => {
         authFetch(`/api/groups/${groupId}/info`).then(async res => {
             if (!res) return;

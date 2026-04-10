@@ -1,9 +1,7 @@
 // public/js/ui/dom.js
-// Tập trung toàn bộ DOM references vào một chỗ.
-// Mọi module import từ đây thay vì gọi getElementById rải rác.
 
 export const dom = {
-    // ── Sidebar ──────────────────────────────────────────────────────────────
+    // Sidebar
     status:       document.getElementById('status-bar'),
     myUsername:   document.getElementById('my-username'),
     searchInput:  document.getElementById('search-input'),
@@ -14,7 +12,7 @@ export const dom = {
     reqList:      document.getElementById('requests-list'),
     reqCount:     document.getElementById('req-count'),
 
-    // ── Chat area ─────────────────────────────────────────────────────────────
+    // Chat area
     chatHeader:    document.getElementById('chat-header'),
     partnerName:   document.getElementById('partner-name'),
     partnerStatus: document.getElementById('partner-status'),
@@ -27,7 +25,7 @@ export const dom = {
     btnUnblock:    document.getElementById('btn-unblock'),
     btnLogout:     document.getElementById('btn-logout'),
 
-    // ── Group ─────────────────────────────────────────────────────────────────
+    // Group
     tabFriends:       document.getElementById('tab-friends'),
     tabGroups:        document.getElementById('tab-groups'),
     panelFriends:     document.getElementById('panel-friends'),
@@ -38,7 +36,7 @@ export const dom = {
     modalCreateGroup: document.getElementById('modal-create-group'),
     modalManageGroup: document.getElementById('modal-manage-group'),
 
-    // ── Mobile ────────────────────────────────────────────────────────────────
+    // Mobile
     btnBack:  document.getElementById('btn-back'),
     chatArea: document.querySelector('.chat-area'),
 };

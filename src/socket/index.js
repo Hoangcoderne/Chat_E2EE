@@ -20,7 +20,7 @@ function registerSocketHandlers(io) {
         // Gắn io vào socket để các handler có thể broadcast tới rooms khác
         socket.io = io;
 
-        // ── Đăng ký handlers theo domain ──────────────────────────────────
+        // Đăng ký handlers theo domain
         presenceHandler(io, socket);
         messageHandler(io, socket);
         friendHandler(io, socket);

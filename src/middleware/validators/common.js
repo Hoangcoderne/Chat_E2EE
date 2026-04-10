@@ -21,7 +21,7 @@ const handleValidationErrors = (req, res, next) => {
     next();
 };
 
-// ── Validators tái sử dụng giữa nhiều domain ─────────────────────────────
+// Validators tái sử dụng giữa nhiều domain
 
 /**
  * Username: 3–20 ký tự, chỉ chữ/số/gạch dưới/gạch ngang.

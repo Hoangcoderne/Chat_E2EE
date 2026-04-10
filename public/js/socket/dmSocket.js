@@ -25,7 +25,7 @@ import { startHandshake }  from '../actions.js';
 
 export function registerDMSocketHandlers(socket) {
 
-    // ── Kết nối lại sau ngắt mạng ─────────────────────────────────────────
+    // Kết nối lại sau ngắt mạng
     socket.on('connect', () => {
         const userId = sessionStorage.getItem('userId');
         if (!userId) return;
@@ -34,7 +34,7 @@ export function registerDMSocketHandlers(socket) {
         if (cachedGroupIds.length) socket.emit('join_groups', cachedGroupIds);
     });
 
-    // ── Handshake: nhận public key → derive shared secret ─────────────────
+    // Handshake: nhận public key → derive shared secret
     socket.on('response_public_key', async (data) => {
         try {
             const { userId, publicKey, username, signingPublicKey } = data;
@@ -82,7 +82,7 @@ export function registerDMSocketHandlers(socket) {
         }
     });
 
-    // ── receive_message: nhận tin DM ──────────────────────────────────────
+    // receive_message: nhận tin DM
     socket.on('receive_message', async (payload) => {
         updateContactPreview(payload.senderId);
         if (payload.senderId === state.currentChat.partnerId) {
@@ -107,7 +107,7 @@ export function registerDMSocketHandlers(socket) {
         }
     });
 
-    // ── message_sent_sync: đồng bộ multi-device ───────────────────────────
+    // message_sent_sync: đồng bộ multi-device─
     socket.on('message_sent_sync', async (payload) => {
         const { senderSocketId, messageId, recipientId, encryptedContent, iv, timestamp, replyTo } = payload;
         if (senderSocketId === socket.id) {
@@ -127,7 +127,7 @@ export function registerDMSocketHandlers(socket) {
         }
     });
 
-    // ── messages_read: đối tác đã đọc tin ────────────────────────────────
+    // messages_read: đối tác đã đọc tin
     socket.on('messages_read', ({ by }) => {
         if (!state.currentChat.partnerId || state.currentChat.partnerId !== by) return;
         if (state.currentGroupId) return;
@@ -136,14 +136,14 @@ export function registerDMSocketHandlers(socket) {
         });
     });
 
-    // ── user_status_change ────────────────────────────────────────────────
+    // user_status_change
     socket.on('user_status_change', ({ userId, status }) => {
         const dot = document.getElementById(`status-${userId}`);
         if (dot) dot.classList.toggle('online', status === 'online');
         updateHeaderStatus(userId);
     });
 
-    // ── Friend events ─────────────────────────────────────────────────────
+    // Friend events
     socket.on('receive_friend_request', (data) => {
         state.friendRequests.push(data);
         updateRequestUI();
@@ -170,7 +170,7 @@ export function registerDMSocketHandlers(socket) {
         updateRequestUI();
     });
 
-    // ── Block events ──────────────────────────────────────────────────────
+    // Block events
     socket.on('you_have_been_blocked', ({ blockerId }) => {
         const li = document.querySelector(`.contact-item[data-id="${blockerId}"]`);
         if (li) {
@@ -187,7 +187,7 @@ export function registerDMSocketHandlers(socket) {
         }
     });
 
-    // ── Generic events ────────────────────────────────────────────────────
+    // Generic events
     socket.on('system_message', ({ text }) => appendMessage(text, 'system'));
 
     socket.on('message_deleted', ({ messageId }) => {

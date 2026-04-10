@@ -12,7 +12,7 @@ import { loadGroupHistory } from '../api.js';
 let _socket = null;
 export function setSocket(s) { _socket = s; }
 
-// ── renderGroupItem ───────────────────────────────────────────────────────
+// renderGroupItem
 export function renderGroupItem(group) {
     if (document.querySelector(`.group-item[data-group-id="${group._id}"]`)) return;
 
@@ -45,7 +45,7 @@ export function renderGroupItem(group) {
     dom.groupsList.appendChild(li);
 }
 
-// ── openGroupChat ─────────────────────────────────────────────────────────
+// openGroupChat
 export async function openGroupChat(group) {
     cancelReply();
     state.currentGroupId = group._id;

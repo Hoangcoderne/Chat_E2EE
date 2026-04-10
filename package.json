@@ -13,7 +13,9 @@
   "jest": {
     "testEnvironment": "node",
     "testTimeout": 30000,
-    "testMatch": ["**/src/__tests__/**/*.test.js"],
+    "testMatch": [
+      "**/src/__tests__/**/*.test.js"
+    ],
     "collectCoverageFrom": [
       "src/controllers/**/*.js",
       "src/middleware/**/*.js",
@@ -21,7 +23,6 @@
     ]
   },
   "dependencies": {
-    "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",

@@ -12,7 +12,7 @@ const logger     = require('../utils/logger');
  */
 module.exports = function friendHandler(io, socket) {
 
-    // ── send_friend_request ────────────────────────────────────────────────
+    // send_friend_request
     socket.on('send_friend_request', async ({ targetUsername }) => {
         try {
             if (!socket.userId)
@@ -62,7 +62,7 @@ module.exports = function friendHandler(io, socket) {
         }
     });
 
-    // ── accept_friend_request ──────────────────────────────────────────────
+    // accept_friend_request
     socket.on('accept_friend_request', async ({ requesterId }) => {
         try {
             if (!socket.userId)
@@ -101,7 +101,7 @@ module.exports = function friendHandler(io, socket) {
         }
     });
 
-    // ── clear_notification: xoá một notification cụ thể ──────────────────
+    // clear_notification: xoá một notification cụ thể
     socket.on('clear_notification', async ({ notifId }) => {
         try {
             if (!notifId || notifId.toString().startsWith('temp_')) return;

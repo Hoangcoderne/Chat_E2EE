@@ -1,10 +1,9 @@
 // src/server.js
 // Entry point: kiểm tra env → kết nối DB → khởi tạo HTTP + Socket.io → lắng nghe.
-// Không chứa business logic, middleware hay socket handlers — tất cả đã được tách ra.
 
 require('dotenv').config();
 
-// ── Kiểm tra biến môi trường bắt buộc ────────────────────────────────────
+// Kiểm tra biến môi trường bắt buộc
 const REQUIRED_ENV = ['MONGO_URI', 'SESSION_SECRET', 'FRONTEND_URL'];
 REQUIRED_ENV.forEach(key => {
     if (!process.env[key]) {
@@ -21,10 +20,10 @@ const logger     = require('./utils/logger');
 const app        = require('./app');
 const registerSocketHandlers = require('./socket');
 
-// ── HTTP server ───────────────────────────────────────────────────────────
+// HTTP server
 const server = http.createServer(app);
 
-// ── Socket.io ─────────────────────────────────────────────────────────────
+// Socket.io
 const io = new Server(server, {
     cors: {
         origin:      process.env.FRONTEND_URL,
@@ -39,10 +38,10 @@ global.onlineUsers = new Map();
 // Đăng ký toàn bộ Socket.io event handlers
 registerSocketHandlers(io);
 
-// ── Database ──────────────────────────────────────────────────────────────
+// Database
 connectDB();
 
-// ── Process-level error guards ────────────────────────────────────────────
+// Process-level error guards
 process.on('unhandledRejection', (reason) => {
     logger.error({ event: 'unhandled_rejection', error: String(reason) });
 });
@@ -52,7 +51,7 @@ process.on('uncaughtException', (err) => {
     process.exit(1); // Crash có kiểm soát để PM2 / Docker restart lại
 });
 
-// ── Start ─────────────────────────────────────────────────────────────────
+// Start
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     logger.info({ event: 'server_start', port: PORT, env: process.env.NODE_ENV || 'development' });

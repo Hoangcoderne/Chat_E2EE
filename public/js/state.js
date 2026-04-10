@@ -4,7 +4,7 @@
 // Dùng object thay vì export let vì ES module bindings là read-only từ ngoài.
 
 export const state = {
-    // ── Auth ────────────────────────────────────────────────────────────────
+    // Auth
     myIdentity: {
         userId:           null,
         username:         null,
@@ -12,7 +12,7 @@ export const state = {
         signingPrivateKey: null,  // ECDSA CryptoKey
     },
 
-    // ── Active DM chat ───────────────────────────────────────────────────────
+    // Active DM chat
     currentChat: {
         partnerId:              null,
         partnerPublicKey:       null,
@@ -20,22 +20,22 @@ export const state = {
         sharedSecret:           null,   // AES-GCM CryptoKey — không bao giờ lên server
     },
 
-    // ── Active group chat ────────────────────────────────────────────────────
+    // Active group chat
     currentGroupId: null,
 
-    // ── Group key cache (tránh fetch lại mỗi lần mở chat) ───────────────────
+    // Group key cache (tránh fetch lại mỗi lần mở chat)
     groupKeys: new Map(), // Map<groupId, CryptoKey>
 
-    // ── Notification state ───────────────────────────────────────────────────
+    // Notification state
     friendRequests: [],
     notifications:  [],
 
-    // ── Unread badges ────────────────────────────────────────────────────────
+    // Unread badges
     unreadCounts: {}, // { [contactId]: number }
 
-    // ── Pending forward (sau khi handshake xong mới gửi) ─────────────────────
+    // Pending forward (sau khi handshake xong mới gửi)
     pendingForward: null, // { text, targetId }
 
-    // ── Reply state ──────────────────────────────────────────────────────────
+    // Reply state
     currentReply: null,   // { messageId, senderName, plaintext }
 };

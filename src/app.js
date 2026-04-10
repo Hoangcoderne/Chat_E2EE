@@ -1,6 +1,5 @@
 // src/app.js
 // Chỉ khởi tạo Express app, gắn middleware và routes.
-// Tách khỏi server.js để dễ test và tái sử dụng (ví dụ: supertest không cần HTTP server thật).
 
 const express      = require('express');
 const path         = require('path');
@@ -17,12 +16,12 @@ const groupRoutes = require('./routes/groupRoutes');
 
 const app = express();
 
-// ── Trust proxy ───────────────────────────────────────────────────────────
+//  Trust proxy 
 // Bắt buộc khi deploy sau Nginx / Heroku / Render.
 // Không có → rate limit dùng IP proxy thay vì IP client thật.
 app.set('trust proxy', 1);
 
-// ── Security headers (Helmet) ─────────────────────────────────────────────
+//  Security headers (Helmet) ─
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -41,18 +40,18 @@ app.use(helmet({
     crossOriginEmbedderPolicy: false,
 }));
 
-// ── Body / Cookie parsers ─────────────────────────────────────────────────
+//  Body / Cookie parsers 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// ── HTTP request logging ──────────────────────────────────────────────────
+//  HTTP request logging 
 app.use(requestLogger);
 
-// ── Static files ──────────────────────────────────────────────────────────
+//  Static files 
 app.use(express.static(path.join(__dirname, '../public')));
 
-// ── Rate limiting ─────────────────────────────────────────────────────────
+//  Rate limiting ─
 // Thứ tự quan trọng: specific limiters TRƯỚC apiLimiter chung
 app.use('/api/auth/login',           authLimiter);
 app.use('/api/auth/register',        registerLimiter);
@@ -60,14 +59,13 @@ app.use('/api/auth/verify-recovery', resetLimiter);
 app.use('/api/auth/reset-password',  resetLimiter);
 app.use('/api/',                     apiLimiter);
 
-// ── Routes ────────────────────────────────────────────────────────────────
+//  Routes 
 app.use('/api/auth',   authRoutes);
 app.use('/api/chat',   chatRoutes);
 app.use('/api/groups', groupRoutes);
 
-// ── Global error handler ──────────────────────────────────────────────────
+//  Global error handler 
 // Bắt tất cả lỗi không được xử lý trong routes / middleware phía trên.
-// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
     logger.error({
         event:  'unhandled_error',

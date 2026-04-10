@@ -1,6 +1,5 @@
 // public/js/app.js
 // Entry point — chỉ khởi tạo, kết nối các module, đăng ký event listeners DOM.
-// Business logic KHÔNG nằm ở đây.
 
 import { state }    from './state.js';
 import { dom }      from './ui/dom.js';
@@ -13,7 +12,7 @@ import { registerDMSocketHandlers }    from './socket/dmSocket.js';
 import { registerGroupSocketHandlers } from './socket/groupSocket.js';
 import { cancelReply } from './ui/messageUI.js';
 
-// ── Khởi tạo Socket.io ────────────────────────────────────────────────────
+// Khởi tạo Socket.io
 // eslint-disable-next-line no-undef
 const socket = io();
 
@@ -26,9 +25,7 @@ setActionsSocket(socket);
 registerDMSocketHandlers(socket);
 registerGroupSocketHandlers(socket);
 
-// ════════════════════════════════════════════════════════════════════════════
 // initApp — chạy một lần khi trang load
-// ════════════════════════════════════════════════════════════════════════════
 async function initApp() {
     const token    = localStorage.getItem('accessToken');
     const userId   = sessionStorage.getItem('userId');
@@ -65,9 +62,7 @@ async function initApp() {
     }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
 // Mobile navigation
-// ════════════════════════════════════════════════════════════════════════════
 function goBackToSidebar() {
     dom.chatArea.classList.remove('mobile-active');
     document.querySelector('.sidebar').classList.remove('mobile-hidden');
@@ -79,14 +74,12 @@ window.addEventListener('popstate', () => {
     goBackToSidebar();
 });
 
-// ════════════════════════════════════════════════════════════════════════════
 // DOM Event Listeners
-// ════════════════════════════════════════════════════════════════════════════
 
-// ── Auth ──────────────────────────────────────────────────────────────────
+// Auth
 dom.btnLogout.addEventListener('click', logout);
 
-// ── Send message (DM hoặc Group) ──────────────────────────────────────────
+// Send message (DM hoặc Group)
 dom.btnSend.addEventListener('click', () => {
     if (state.currentGroupId) sendGroupMessage();
     else                      sendMessage();
@@ -97,10 +90,10 @@ dom.msgInput.addEventListener('keypress', (e) => {
     else                      sendMessage();
 });
 
-// ── Back (mobile) ─────────────────────────────────────────────────────────
+// Back (mobile)
 dom.btnBack.addEventListener('click', () => { goBackToSidebar(); history.back(); });
 
-// ── Search / Add contact ──────────────────────────────────────────────────
+// Search / Add contact
 dom.btnConnect.addEventListener('click', () => {
     const targetUsername = dom.searchInput.value.trim();
     if (!targetUsername) return;
@@ -109,13 +102,13 @@ dom.btnConnect.addEventListener('click', () => {
     else          socket.emit('send_friend_request', { targetUsername });
 });
 
-// ── Notification popup ────────────────────────────────────────────────────
+// Notification popup
 dom.btnRequests.addEventListener('click', (e) => {
     e.stopPropagation();
     dom.reqPopup.classList.toggle('hidden');
 });
 
-// ── Click outside → close menus ──────────────────────────────────────────
+// Click outside → close menus
 document.addEventListener('click', (e) => {
     if (!e.target.closest('.contact-options-btn') && !e.target.closest('.options-menu'))
         document.querySelectorAll('.options-menu').forEach(el => el.classList.add('hidden'));
@@ -127,7 +120,7 @@ document.addEventListener('click', (e) => {
         dom.reqPopup.classList.add('hidden');
 });
 
-// ── Sidebar tabs ──────────────────────────────────────────────────────────
+// Sidebar tabs
 dom.tabFriends?.addEventListener('click', () => {
     dom.tabFriends.classList.add('active'); dom.tabGroups.classList.remove('active');
     dom.panelFriends.classList.remove('hidden'); dom.panelGroups.classList.add('hidden');
@@ -137,14 +130,14 @@ dom.tabGroups?.addEventListener('click', () => {
     dom.panelGroups.classList.remove('hidden'); dom.panelFriends.classList.add('hidden');
 });
 
-// ── Create Group Modal ────────────────────────────────────────────────────
+// Create Group Modal
 dom.btnCreateGroup?.addEventListener('click', openCreateGroupModal);
 document.getElementById('btn-close-create-group')?.addEventListener('click', () => dom.modalCreateGroup.classList.add('hidden'));
 document.getElementById('btn-cancel-create-group')?.addEventListener('click', () => dom.modalCreateGroup.classList.add('hidden'));
 document.getElementById('btn-submit-create-group')?.addEventListener('click', submitCreateGroup);
 dom.modalCreateGroup?.addEventListener('click', (e) => { if (e.target === dom.modalCreateGroup) dom.modalCreateGroup.classList.add('hidden'); });
 
-// ── Manage Group Modal ────────────────────────────────────────────────────
+// Manage Group Modal
 dom.btnManageGroup?.addEventListener('click', () => {
     const groupId = dom.btnManageGroup.dataset.groupId;
     if (groupId) { dom.modalManageGroup.classList.remove('hidden'); loadManageModal(groupId); }
@@ -172,5 +165,5 @@ document.getElementById('btn-leave-group')?.addEventListener('click', async () =
 });
 document.getElementById('btn-add-member')?.addEventListener('click', addSelectedMembers);
 
-// ── Khởi động ─────────────────────────────────────────────────────────────
+// Khởi động
 initApp();

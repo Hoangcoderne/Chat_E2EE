@@ -14,7 +14,7 @@ const logger     = require('../utils/logger');
  */
 module.exports = function messageHandler(io, socket) {
 
-    // ── request_public_key: lấy public key + signing key của đối tác ──────
+    //  request_public_key: lấy public key + signing key của đối tác 
     socket.on('request_public_key', async ({ username }) => {
         try {
             const user = await User.findOne({ username }).select('_id username publicKey signingPublicKey');
@@ -33,7 +33,7 @@ module.exports = function messageHandler(io, socket) {
         }
     });
 
-    // ── send_message: relay tin nhắn E2EE ─────────────────────────────────
+    //  send_message: relay tin nhắn E2EE
     socket.on('send_message', async ({ recipientId, encryptedContent, iv, signature, replyTo }) => {
         try {
             if (!socket.userId)
@@ -51,10 +51,10 @@ module.exports = function messageHandler(io, socket) {
 
             if (!friendship || friendship.status === 'pending') {
                 socket.emit('system_message', {
-                    text: '⚠️ Hai bạn chưa phải là bạn bè. Hãy gửi lời mời kết bạn trước.',
+                    text: 'Hai bạn chưa phải là bạn bè. Hãy gửi lời mời kết bạn trước.',
                 });
                 io.to(recipientId).emit('system_message', {
-                    text: `⚠️ ${socket.username || 'Ai đó'} cố gắng nhắn tin nhưng hai bạn chưa phải bạn bè.`,
+                    text: `${socket.username || 'Ai đó'} cố gắng nhắn tin nhưng hai bạn chưa phải bạn bè.`,
                 });
                 return;
             }
@@ -100,7 +100,7 @@ module.exports = function messageHandler(io, socket) {
         }
     });
 
-    // ── mark_read: đánh dấu đã đọc khi mở chat ────────────────────────────
+    //  mark_read: đánh dấu đã đọc khi mở chat 
     socket.on('mark_read', async ({ partnerId }) => {
         try {
             if (!socket.userId) return;
@@ -118,21 +118,21 @@ module.exports = function messageHandler(io, socket) {
         }
     });
 
-    // ── broadcast_delete_message: xoá tin nhắn real-time ──────────────────
+    //  broadcast_delete_message: xoá tin nhắn real-time 
     socket.on('broadcast_delete_message', ({ messageId, recipientId }) => {
         if (!socket.userId) return;
         io.to(recipientId).emit('message_deleted', { messageId });
         io.to(socket.userId).emit('message_deleted', { messageId }); // sync thiết bị khác của sender
     });
 
-    // ── broadcast_reaction: cập nhật reaction real-time ───────────────────
+    //  broadcast_reaction: cập nhật reaction real-time ─
     socket.on('broadcast_reaction', ({ messageId, reactions, partnerId }) => {
         if (!socket.userId) return;
         io.to(partnerId).emit('reaction_updated', { messageId, reactions });
         io.to(socket.userId).emit('reaction_updated', { messageId, reactions }); // sync thiết bị khác
     });
 
-    // ── notify_block / notify_unblock ──────────────────────────────────────
+    //  notify_block / notify_unblock 
     socket.on('notify_block', ({ targetId }) => {
         if (!socket.userId) return;
         socket.to(targetId).emit('you_have_been_blocked', { blockerId: socket.userId });
