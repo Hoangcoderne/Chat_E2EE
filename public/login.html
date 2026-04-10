@@ -4,21 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Đăng nhập - SecureChat E2EE</title>
-    <style>
-        /* CSS dùng chung với register */
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; }
-        .auth-container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 350px; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        .error { color: red; font-size: 0.9em; margin-bottom: 10px; display: none; }
-        .success { color: green; font-size: 0.9em; margin-bottom: 10px; display: none; }
-    </style>
+    <link rel="stylesheet" href="styles/auth.css">
 </head>
-<body>
+<body class="auth-body">
     <div class="auth-container">
-        <h2 style="text-align: center;">Đăng nhập</h2>
-        <p style="text-align: center; font-size: 0.8em; color: gray;">Khôi phục khóa bảo mật</p>
+        <h2 class="text-center">Đăng nhập</h2>
+        <p class="text-center text-sub text-gray">Khôi phục khóa bảo mật</p>
 
         <div id="error-msg" class="error"></div>
         <div id="success-msg" class="success"></div>
@@ -27,14 +18,14 @@
             <input type="text" id="username" placeholder="Tên đăng nhập" required autocomplete="off">
             <input type="password" id="password" placeholder="Mật khẩu" required>
             
-            <button type="submit" id="btn-submit">Đăng nhập</button>
+            <button type="submit" id="btn-submit" class="btn-green">Đăng nhập</button>
         </form>
         
-        <p style="text-align: center; margin-top: 15px;">
+        <p class="text-center mt-15">
             Chưa có tài khoản? <a href="register.html">Đăng ký</a>
         </p>
-        <p style="text-align: center; margin-top: 8px;">
-            <a href="forgot-password.html" style="color: #888; font-size: 0.85em;">Quên mật khẩu?</a>
+        <p class="text-center mt-8">
+            <a href="forgot-password.html" class="link-muted text-xs">Quên mật khẩu?</a>
         </p>
     </div>
 

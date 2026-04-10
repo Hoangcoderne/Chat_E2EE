@@ -267,3 +267,7 @@
     padding: 4px 10px; font-size: 12px; cursor: pointer; transition: background .12s;
 }
 .btn-remove-member:hover { background: #fff0f0; }
+
+/* ── Helpers (replacing inline styles for CSP) ── */
+.modal-label-top { margin-top: 14px; }
+.btn-add-member-full { margin-top: 10px; width: 100%; }

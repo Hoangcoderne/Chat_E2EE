@@ -1,0 +1,193 @@
+/* public/styles/auth.css */
+/* Styles chung cho login, register, forgot-password pages */
+
+/* ── Base ── */
+.auth-body {
+    font-family: sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: #f0f2f5;
+    margin: 0;
+}
+
+.auth-container {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    width: 360px;
+}
+
+.auth-container.wide { width: 380px; }
+
+.auth-container input {
+    width: 100%;
+    padding: 10px;
+    margin: 8px 0 4px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+
+.auth-container button {
+    width: 100%;
+    padding: 10px;
+    background: #0084ff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 15px;
+}
+
+.auth-container button:disabled { background: #ccc; cursor: not-allowed; }
+
+/* ── Color variants ── */
+.btn-green  { background: #28a745; }
+.btn-orange { background: #f0a500; }
+.btn-blue   { background: #0084ff; }
+
+/* ── Messages ── */
+.error {
+    color: red;
+    font-size: 0.9em;
+    margin-bottom: 10px;
+    display: none;
+    white-space: pre-line;
+}
+
+.success {
+    color: green;
+    font-size: 0.9em;
+    margin-bottom: 10px;
+    display: none;
+}
+
+.error-box {
+    background: #fff0f0;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ffcccc;
+}
+
+.success-box {
+    background: #f0fff4;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ccffcc;
+}
+
+/* ── Text helpers ── */
+.text-center     { text-align: center; }
+.text-gray       { color: gray; }
+.text-sm         { font-size: 0.9em; }
+.text-xs         { font-size: 0.85em; }
+.text-xxs        { font-size: 0.82em; }
+.text-sub        { font-size: 0.8em; }
+.text-muted      { color: #555; }
+.mt-0            { margin-top: 0; }
+.mt-8            { margin-top: 8px; }
+.mt-10           { margin-top: 10px; }
+.mt-12           { margin-top: 12px; }
+.mt-15           { margin-top: 15px; }
+.mt-16           { margin-top: 16px; }
+.mb-0            { margin-bottom: 0; }
+.mb-2            { margin-bottom: 2px; }
+.mb-4            { margin-bottom: 4px; }
+.mb-8            { margin-bottom: 8px; }
+.mb-10           { margin-bottom: 10px; }
+.mb-16           { margin-bottom: 16px; }
+.mb-20           { margin-bottom: 20px; }
+.link-muted      { color: #888; }
+.font-mono       { font-family: monospace; }
+.ls-1            { letter-spacing: 1px; }
+.py-20           { padding: 20px 0; }
+
+/* ── Password strength bar ── */
+.strength-wrap {
+    margin: 2px 0 6px;
+}
+
+.strength-bar {
+    height: 4px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 3px;
+}
+
+#strength-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 2px;
+    transition: width .3s, background .3s;
+}
+
+#strength-hint {
+    font-size: 11px;
+    font-weight: 600;
+    min-height: 14px;
+}
+
+/* ── Password tips ── */
+#password-tips {
+    display: none;
+    margin: 4px 0 8px;
+    padding: 6px 10px;
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #7a5800;
+    list-style: none;
+}
+#password-tips li::before { content: '• '; }
+
+/* ── Username hint ── */
+#username-hint {
+    font-size: 11px;
+    min-height: 14px;
+    margin-bottom: 4px;
+}
+
+/* ── Forgot password steps ── */
+.step { display: none; }
+.step.active { display: block; }
+
+.step-indicator {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+
+.step-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ddd;
+}
+.step-dot.active { background: #f0a500; }
+.step-dot.done   { background: #28a745; }
+
+.recovery-hint {
+    font-family: monospace;
+    font-size: 0.82em;
+    color: #888;
+    text-align: center;
+    margin-bottom: 4px;
+}
+
+.step-desc {
+    font-size: 0.88em;
+    color: #555;
+    margin-bottom: 12px;
+}
+
+/* ── Success panel ── */
+.success-icon { font-size: 3em; margin-bottom: 10px; }
+.success-title { color: #28a745; margin-bottom: 8px; }

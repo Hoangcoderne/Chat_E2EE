@@ -3,9 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <style>
-        html, body { height: 100%; overflow: hidden; }
-    </style>
     <title>SecureChat E2EE</title>
     <link rel="stylesheet" href="styles/base.css">
     <link rel="stylesheet" href="styles/sidebar.css">
@@ -56,7 +53,7 @@
             <!-- Danh sách nhóm -->
             <div class="contacts-area hidden" id="panel-groups">
                 <div class="group-list-header">
-                    <span style="font-size:13px;color:#666">Nhóm của bạn</span>
+                    <span class="group-label-text">Nhóm của bạn</span>
                     <button id="btn-create-group" class="btn-create-group" title="Tạo nhóm mới">＋ Tạo nhóm</button>
                 </div>
                 <ul id="groups-list" class="contacts-list"></ul>
@@ -112,7 +109,7 @@
                 <input type="text" id="group-name-input" placeholder="Nhập tên nhóm..." maxlength="50" class="modal-input">
 
                 <!-- Tìm & thêm thành viên -->
-                <label class="modal-label" style="margin-top:14px">Thêm thành viên từ bạn bè</label>
+                <label class="modal-label modal-label-top">Thêm thành viên từ bạn bè</label>
                 <div id="friend-checkboxes" class="friend-checkbox-list">
                     <!-- Render bởi JS -->
                 </div>
@@ -148,9 +145,9 @@
 
                 <!-- Thêm thành viên (admin only) -->
                 <div id="add-member-section" class="hidden">
-                    <label class="modal-label" style="margin-top:14px">Thêm thành viên</label>
+                    <label class="modal-label modal-label-top">Thêm thành viên</label>
                     <div id="add-member-checkboxes" class="friend-checkbox-list"></div>
-                    <button id="btn-add-member" class="btn-modal-primary" style="margin-top:10px;width:100%">
+                    <button id="btn-add-member" class="btn-modal-primary btn-add-member-full">
                         ＋ Thêm thành viên đã chọn
                     </button>
                 </div>

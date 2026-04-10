@@ -4,64 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Đăng ký - SecureChat E2EE</title>
-    <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f0f2f5; }
-        .auth-container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 360px; }
-        input { width: 100%; padding: 10px; margin: 8px 0 4px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #0084ff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        .error   { color: red;   font-size: 0.9em; margin-bottom: 10px; display: none; white-space: pre-line; }
-        .success { color: green; font-size: 0.9em; margin-bottom: 10px; display: none; }
-
-        /* ── Password strength bar ── */
-        .strength-wrap {
-            margin: 0 0 8px;
-        }
-        .strength-bar {
-            height: 4px;
-            background: #e0e0e0;
-            border-radius: 2px;
-            overflow: hidden;
-            margin-bottom: 4px;
-        }
-        #strength-bar-fill {
-            height: 100%;
-            width: 0%;
-            border-radius: 2px;
-            transition: width .3s, background .3s;
-        }
-        #strength-hint {
-            font-size: 11px;
-            font-weight: 600;
-            min-height: 14px;
-        }
-        #password-tips {
-            display: none;
-            margin: 4px 0 8px;
-            padding: 6px 10px;
-            background: #fff8e1;
-            border: 1px solid #ffe082;
-            border-radius: 4px;
-            font-size: 11px;
-            color: #7a5800;
-            list-style: none;
-        }
-        #password-tips li::before { content: '• '; }
-    </style>
+    <link rel="stylesheet" href="styles/auth.css">
 </head>
-<body>
+<body class="auth-body">
     <div class="auth-container">
-        <h2 style="text-align: center; margin-bottom: 4px">SecureChat Đăng ký</h2>
-        <p style="text-align: center; font-size: 0.8em; color: gray; margin-bottom: 16px">Mã hóa đầu cuối (E2EE)</p>
+        <h2 class="text-center mb-4">SecureChat Đăng ký</h2>
+        <p class="text-center text-sub text-gray mb-16">Mã hóa đầu cuối (E2EE)</p>
 
         <div id="error-msg" class="error"></div>
         <div id="success-msg" class="success"></div>
 
         <form id="register-form">
             <!-- Username -->
-            <input type="text" id="username" placeholder="Tên đăng nhập" required autocomplete="off"
-                   style="margin-bottom:2px">
-            <div id="username-hint" style="font-size:11px;min-height:14px;margin-bottom:4px"></div>
+            <input type="text" id="username" placeholder="Tên đăng nhập" required autocomplete="off" class="mb-2">
+            <div id="username-hint"></div>
 
             <input type="password" id="password" placeholder="Mật khẩu" required minlength="8">
             <!-- Strength indicator -->
@@ -73,10 +29,10 @@
 
             <input type="password" id="confirm-password" placeholder="Xác nhận mật khẩu" required>
 
-            <button type="submit" id="btn-submit" style="margin-top: 12px">Đăng ký & Tạo Khóa</button>
+            <button type="submit" id="btn-submit" class="mt-12">Đăng ký & Tạo Khóa</button>
         </form>
 
-        <p style="text-align: center; margin-top: 15px; font-size: 0.9em">
+        <p class="text-center mt-15 text-sm">
             Đã có tài khoản? <a href="login.html">Đăng nhập</a>
         </p>
     </div>
