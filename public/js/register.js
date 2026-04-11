@@ -231,7 +231,7 @@ async function doRegister() {
 
 // UI: Hiện trang recovery key (Phase 1 → Phase 2)
 function showRecoveryStep(recoveryDisplay) {
-    // Ẩn TẤT CẢ nội dung gốc trong auth-container
+    // Ẩn TẤT CẢ nội dung gốc trong auth-container (h2, p, form, link p)
     const container = form.parentNode;
     Array.from(container.children).forEach(child => child.classList.add('hidden'));
 
@@ -272,7 +272,7 @@ function showRecoveryStep(recoveryDisplay) {
         <button id="btn-back-to-form" class="btn-back-to-form" type="button">← Quay lại chỉnh sửa thông tin</button>
     `;
 
-    // Chèn panel vào container
+    // Chèn panel cuối container — toàn bộ nội dung cũ đã hidden
     container.appendChild(panel);
 
     // Event listeners
@@ -305,7 +305,6 @@ function showRecoveryStep(recoveryDisplay) {
     document.getElementById('btn-back-to-form').addEventListener('click', () => {
         panel.remove();
         pendingPayload = null;
-        // Hiện lại tất cả children gốc (trừ error/success msg để tránh flash)
         Array.from(container.children).forEach(child => {
             if (child.id !== 'error-msg' && child.id !== 'success-msg') {
                 child.classList.remove('hidden');
