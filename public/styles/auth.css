@@ -16,11 +16,13 @@
     background: white;
     padding: 2rem;
     border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     width: 360px;
 }
 
-.auth-container.wide { width: 380px; }
+.auth-container.wide {
+    width: 380px;
+}
 
 .auth-container input {
     width: 100%;
@@ -87,12 +89,23 @@
     font-size: 15px;
 }
 
-.auth-container button:not(.toggle-password):disabled { background: #ccc; cursor: not-allowed; }
+.auth-container button:not(.toggle-password):disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
 
 /* ── Color variants ── */
-.btn-green  { background: #28a745; }
-.btn-orange { background: #f0a500; }
-.btn-blue   { background: #0084ff; }
+.btn-green {
+    background: #28a745;
+}
+
+.btn-orange {
+    background: #f0a500;
+}
+
+.btn-blue {
+    background: #0084ff;
+}
 
 /* ── Messages ── */
 .error {
@@ -125,30 +138,101 @@
 }
 
 /* ── Text helpers ── */
-.text-center     { text-align: center; }
-.text-gray       { color: gray; }
-.text-sm         { font-size: 0.9em; }
-.text-xs         { font-size: 0.85em; }
-.text-xxs        { font-size: 0.82em; }
-.text-sub        { font-size: 0.8em; }
-.text-muted      { color: #555; }
-.mt-0            { margin-top: 0; }
-.mt-8            { margin-top: 8px; }
-.mt-10           { margin-top: 10px; }
-.mt-12           { margin-top: 12px; }
-.mt-15           { margin-top: 15px; }
-.mt-16           { margin-top: 16px; }
-.mb-0            { margin-bottom: 0; }
-.mb-2            { margin-bottom: 2px; }
-.mb-4            { margin-bottom: 4px; }
-.mb-8            { margin-bottom: 8px; }
-.mb-10           { margin-bottom: 10px; }
-.mb-16           { margin-bottom: 16px; }
-.mb-20           { margin-bottom: 20px; }
-.link-muted      { color: #888; }
-.font-mono       { font-family: monospace; }
-.ls-1            { letter-spacing: 1px; }
-.py-20           { padding: 20px 0; }
+.text-center {
+    text-align: center;
+}
+
+.text-gray {
+    color: gray;
+}
+
+.text-sm {
+    font-size: 0.9em;
+}
+
+.text-xs {
+    font-size: 0.85em;
+}
+
+.text-xxs {
+    font-size: 0.82em;
+}
+
+.text-sub {
+    font-size: 0.8em;
+}
+
+.text-muted {
+    color: #555;
+}
+
+.mt-0 {
+    margin-top: 0;
+}
+
+.mt-8 {
+    margin-top: 8px;
+}
+
+.mt-10 {
+    margin-top: 10px;
+}
+
+.mt-12 {
+    margin-top: 12px;
+}
+
+.mt-15 {
+    margin-top: 15px;
+}
+
+.mt-16 {
+    margin-top: 16px;
+}
+
+.mb-0 {
+    margin-bottom: 0;
+}
+
+.mb-2 {
+    margin-bottom: 2px;
+}
+
+.mb-4 {
+    margin-bottom: 4px;
+}
+
+.mb-8 {
+    margin-bottom: 8px;
+}
+
+.mb-10 {
+    margin-bottom: 10px;
+}
+
+.mb-16 {
+    margin-bottom: 16px;
+}
+
+.mb-20 {
+    margin-bottom: 20px;
+}
+
+.link-muted {
+    color: #888;
+}
+
+.font-mono {
+    font-family: monospace;
+}
+
+.ls-1 {
+    letter-spacing: 1px;
+}
+
+.py-20 {
+    padding: 20px 0;
+}
 
 /* ── Password strength bar ── */
 .strength-wrap {
@@ -188,7 +272,10 @@
     color: #7a5800;
     list-style: none;
 }
-#password-tips li::before { content: '• '; }
+
+#password-tips li::before {
+    content: '• ';
+}
 
 /* ── Username hint ── */
 #username-hint {
@@ -198,8 +285,13 @@
 }
 
 /* ── Forgot password steps ── */
-.step { display: none; }
-.step.active { display: block; }
+.step {
+    display: none;
+}
+
+.step.active {
+    display: block;
+}
 
 .step-indicator {
     display: flex;
@@ -214,8 +306,14 @@
     border-radius: 50%;
     background: #ddd;
 }
-.step-dot.active { background: #f0a500; }
-.step-dot.done   { background: #28a745; }
+
+.step-dot.active {
+    background: #f0a500;
+}
+
+.step-dot.done {
+    background: #28a745;
+}
 
 .recovery-hint {
     font-family: monospace;
@@ -232,8 +330,15 @@
 }
 
 /* ── Success panel ── */
-.success-icon { font-size: 3em; margin-bottom: 10px; }
-.success-title { color: #28a745; margin-bottom: 8px; }
+.success-icon {
+    font-size: 3em;
+    margin-bottom: 10px;
+}
+
+.success-title {
+    color: #28a745;
+    margin-bottom: 8px;
+}
 
 /* ════════════════════════════════════════════════════
    RECOVERY KEY PANEL — Hiện sau khi đăng ký thành công
@@ -246,15 +351,22 @@
 }
 
 @keyframes recoveryFadeIn {
-    from { opacity: 0; transform: translateY(12px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Header icon + title */
 .recovery-panel-icon {
     font-size: 2.5em;
     margin-bottom: 6px;
-    filter: drop-shadow(0 2px 4px rgba(240,165,0,0.3));
+    filter: drop-shadow(0 2px 4px rgba(240, 165, 0, 0.3));
 }
 
 .recovery-panel-title {
@@ -294,7 +406,7 @@
     margin-bottom: 12px;
     text-align: center;
     line-height: 1.8;
-    box-shadow: inset 0 1px 3px rgba(245,158,11,0.15);
+    box-shadow: inset 0 1px 3px rgba(245, 158, 11, 0.15);
 }
 
 .recovery-key-box::before {
@@ -313,6 +425,7 @@
 .btn-copy-recovery {
     display: inline-flex;
     align-items: center;
+    text-align: center;
     gap: 6px;
     background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
     color: white;
@@ -324,19 +437,18 @@
     font-weight: 600;
     margin-bottom: 20px;
     transition: transform 0.15s, box-shadow 0.15s;
-    box-shadow: 0 2px 8px rgba(245,158,11,0.25);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
     width: auto;
-    text-align: center;
 }
 
 .btn-copy-recovery:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(245,158,11,0.35);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
 }
 
 .btn-copy-recovery.copied {
     background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-    box-shadow: 0 2px 8px rgba(34,197,94,0.25);
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
 }
 
 /* Confirmation checkbox */
@@ -404,12 +516,12 @@
 .btn-create-account.active {
     background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(34,197,94,0.25);
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
 }
 
 .btn-create-account.active:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(34,197,94,0.35);
+    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35);
 }
 
 /* Back to form button */
@@ -440,7 +552,7 @@
 .recovery-success-icon {
     font-size: 3em;
     margin-bottom: 12px;
-    filter: drop-shadow(0 2px 4px rgba(34,197,94,0.3));
+    filter: drop-shadow(0 2px 4px rgba(34, 197, 94, 0.3));
 }
 
 .recovery-success-title {
@@ -468,10 +580,10 @@
     font-weight: 700;
     font-size: 0.95em;
     transition: transform 0.15s, box-shadow 0.15s;
-    box-shadow: 0 2px 8px rgba(59,130,246,0.25);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
 }
 
 .btn-goto-login:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(59,130,246,0.35);
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
 }

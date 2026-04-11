@@ -1,31 +1,43 @@
 # SecureChat — End-to-End Encrypted Messaging System
 
+![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-6.0+-47A248?logo=mongodb&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-210%20passed-brightgreen)
+![Security](https://img.shields.io/badge/E2EE-Zero--Knowledge-blueviolet)
+![License](https://img.shields.io/badge/License-MIT-blue)
+
 > A web-based messaging application built on a **Zero-Knowledge Architecture**. The server acts only as a blind relay and never has access to user passwords, private keys, or plaintext message content. All cryptographic operations occur strictly on the client-side via the **Web Crypto API**.
 
 ---
 
 ## Demo
 
-### Image Demo
+### Image Demo Desktop
 
 | Register | Login |
 |:---:|:---:|
-|![Register Page](docs/screenshots/Register.png)|![Register Page](docs/screenshots/Login.png)|
+|![Register Page](docs/screenshots/Register.png)|![Login Page](docs/screenshots/Login.png)|
 
 | Save Recovery Key | Forgot Password |
 |:---:|:---:|
-|![Register Page](docs/screenshots/Save_recoveryKey.png)|![Register Page](docs/screenshots/Forgot_Pass.png)|
+|![Recovery Key Page](docs/screenshots/Save_recoveryKey.png)|![Forgot Password Page](docs/screenshots/Forgot_Pass.png)|
 
 | Home Page |
 |:---:|
 |![Home Page](docs/screenshots/HomePage.png)|
 
 ---
+### Image Demo Mobile
 
-### Live Demo
-```
-https://chat-e2ee-sjvl.onrender.com/
-```
+| Sidebar | frame chat |
+|:---:|:---:|
+|![Sidebar Page](docs/screenshots/mobile_sidebar.jpg)|![Chat Page](docs/screenshots/mobile_chat.jpg)|
+
+
+
+### Live Demo (Deploy by Render)
+
+🔗 **[https://chat-e2ee-sjvl.onrender.com](https://chat-e2ee-sjvl.onrender.com/)**
 
 ## How It Works
 
@@ -418,6 +430,7 @@ CHAT_E2EE/
     ├── forgot-password.html
     ├── styles/                           # Modular CSS (split from single main.css)
     │   ├── base.css                      # Body reset, layout, utilities
+    │   ├── auth.css                      # Login, register, forgot-password, recovery key panel
     │   ├── sidebar.css                   # Sidebar, contacts, tabs, profile, menus
     │   ├── chat.css                      # Chat area, messages, emoji, reactions, reply
     │   ├── modal.css                     # All modal dialogs, member lists
@@ -431,6 +444,7 @@ CHAT_E2EE/
         ├── login.js
         ├── register.js
         ├── forgot-password.js
+        ├── password-toggle.js            # Hold-to-reveal password toggle (SVG eye icon)
         ├── crypto/
         │   ├── key-manager.js            # All Web Crypto API operations (ECDH, ECDSA, AES-GCM, PBKDF2)
         │   └── groupCrypto.js            # Group key: encryptForMember, decryptGroupKey, getGroupKey
@@ -450,7 +464,7 @@ CHAT_E2EE/
 ## Installation & Setup
 
 ### Prerequisites
-- Node.js v16+
+- Node.js v18+
 - MongoDB (local or Atlas)
 
 ### Steps
@@ -471,6 +485,26 @@ npm run dev      # development (nodemon)
 npm start        # production
 ```
 
+### `.env.example`
+
+```env
+# Server
+PORT=3000
+NODE_ENV=development
+
+# MongoDB connection string
+MONGO_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?appName=<appName>
+
+# JWT signing secret (generate: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")
+SESSION_SECRET=
+
+# Frontend URL for CORS
+FRONTEND_URL=http://localhost:3000
+
+# Logging level (error, warn, info, debug)
+LOG_LEVEL=info
+```
+
 ### Environment Variables
 
 | Variable | Required | Description |
@@ -489,41 +523,42 @@ npm start        # production
 ### Authentication
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/auth/register` | Đăng ký tài khoản mới |
-| `POST` | `/api/auth/login` | Đăng nhập |
-| `POST` | `/api/auth/refresh` | Refresh token (rotation) |
-| `POST` | `/api/auth/logout` | Đăng xuất |
-| `GET` | `/api/auth/salt?username=` | Lấy salt cho PBKDF2 |
-| `POST` | `/api/auth/verify-recovery` | Xác minh recovery key |
-| `POST` | `/api/auth/reset-password` | Đặt lại mật khẩu |
+| `GET`  | `/api/auth/check-username/:username` | Check if a username already exists |
+| `POST` | `/api/auth/register` | Create a new account |
+| `POST` | `/api/auth/login` | Authenticate and issue tokens |
+| `POST` | `/api/auth/refresh` | Refresh token (with rotation) |
+| `POST` | `/api/auth/logout` | Revoke refresh token and log out |
+| `GET`  | `/api/auth/salt?username=` | Get salt for PBKDF2 derivation |
+| `POST` | `/api/auth/verify-recovery` | Verify recovery key (step 1 of reset) |
+| `POST` | `/api/auth/reset-password` | Reset password using recovery key |
 
 ### Chat
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/chat/history/:partnerId?before=&limit=` | Lịch sử chat (paginated) |
-| `GET` | `/api/chat/contacts` | Danh sách liên hệ |
-| `GET` | `/api/chat/requests` | Lời mời kết bạn |
-| `GET` | `/api/chat/notifications` | Thông báo |
-| `POST` | `/api/chat/unfriend` | Hủy kết bạn |
-| `POST` | `/api/chat/block` | Chặn người dùng |
-| `POST` | `/api/chat/unblock` | Bỏ chặn |
-| `POST` | `/api/chat/message/delete` | Xóa tin nhắn |
-| `POST` | `/api/chat/message/reaction` | Toggle cảm xúc |
+| `GET`  | `/api/chat/history/:partnerId?before=&limit=` | Paginated chat history (cursor-based) |
+| `GET`  | `/api/chat/contacts` | List all contacts with online status |
+| `GET`  | `/api/chat/requests` | Pending friend requests |
+| `GET`  | `/api/chat/notifications` | User notifications |
+| `POST` | `/api/chat/unfriend` | Remove a friend |
+| `POST` | `/api/chat/block` | Block a user |
+| `POST` | `/api/chat/unblock` | Unblock a user |
+| `POST` | `/api/chat/message/delete` | Permanently delete a message |
+| `POST` | `/api/chat/message/reaction` | Toggle emoji reaction |
 
 ### Groups
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/groups/create` | Tạo nhóm |
-| `GET` | `/api/groups` | Danh sách nhóm |
-| `GET` | `/api/groups/:groupId/history?before=&limit=` | Lịch sử nhóm (paginated) |
-| `GET` | `/api/groups/:groupId/info` | Thông tin nhóm |
-| `GET` | `/api/groups/:groupId/my-key` | Lấy group key |
-| `GET` | `/api/groups/member-keys?userIds=` | Public keys thành viên |
-| `POST` | `/api/groups/:groupId/add-member` | Thêm thành viên |
-| `POST` | `/api/groups/:groupId/remove-member` | Xóa thành viên |
-| `POST` | `/api/groups/:groupId/leave` | Rời nhóm |
-| `POST` | `/api/groups/message/delete` | Xóa tin nhắn nhóm |
-| `POST` | `/api/groups/message/reaction` | Toggle cảm xúc nhóm |
+| `POST` | `/api/groups/create` | Create a new group |
+| `GET`  | `/api/groups` | List user's groups |
+| `GET`  | `/api/groups/:groupId/history?before=&limit=` | Paginated group message history |
+| `GET`  | `/api/groups/:groupId/info` | Group info and member list |
+| `GET`  | `/api/groups/:groupId/my-key` | Get encrypted group key for current user |
+| `GET`  | `/api/groups/member-keys?userIds=` | Public keys for group members |
+| `POST` | `/api/groups/:groupId/add-member` | Add a member (admin only) |
+| `POST` | `/api/groups/:groupId/remove-member` | Remove a member (admin only) |
+| `POST` | `/api/groups/:groupId/leave` | Leave the group |
+| `POST` | `/api/groups/message/delete` | Delete a group message |
+| `POST` | `/api/groups/message/reaction` | Toggle emoji reaction on group message |
 
 ### Infrastructure
 | Method | Endpoint | Description |
@@ -571,11 +606,17 @@ Key security assertions verified by tests:
 
 ## Known Limitations
 
+- **No forward secrecy** — Compromise of a long-term ECDH private key allows decryption of all past and future messages encrypted with that key pair. Implementing a Double Ratchet protocol (like Signal) would mitigate this.
 - **No message deletion for recipients** — Only the sender can delete a message; recipient-side deletion is not yet implemented
 - **No media support** — Text messages only; file and image sharing are not supported
 - **No message editing** — Sent messages cannot be edited; only deletion is supported
 - **Single recovery key** — The recovery key is shown once at registration and cannot be regenerated without resetting the password
-- **Frontend pagination UI** — API supports cursor-based pagination; frontend infinite scroll not yet implemented
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
 
 ---
 
