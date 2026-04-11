@@ -231,10 +231,9 @@ async function doRegister() {
 
 // UI: Hiện trang recovery key (Phase 1 → Phase 2)
 function showRecoveryStep(recoveryDisplay) {
-    // Ẩn form
-    form.classList.add('hidden');
-    successMsg.classList.add('hidden');
-    errorMsg.classList.add('hidden');
+    // Ẩn TẤT CẢ nội dung gốc trong auth-container
+    const container = form.parentNode;
+    Array.from(container.children).forEach(child => child.classList.add('hidden'));
 
     const panel = document.createElement('div');
     panel.id = 'recovery-panel';
@@ -274,7 +273,7 @@ function showRecoveryStep(recoveryDisplay) {
     `;
 
     // Chèn panel vào container
-    form.parentNode.insertBefore(panel, form);
+    container.appendChild(panel);
 
     // Event listeners
 
@@ -302,11 +301,16 @@ function showRecoveryStep(recoveryDisplay) {
     // Nút tạo tài khoản — gọi API
     document.getElementById('btn-create-account').addEventListener('click', doRegister);
 
-    // Nút quay lại — xoá panel, hiện lại form
+    // Nút quay lại — xoá panel, hiện lại tất cả nội dung gốc
     document.getElementById('btn-back-to-form').addEventListener('click', () => {
         panel.remove();
         pendingPayload = null;
-        form.classList.remove('hidden');
+        // Hiện lại tất cả children gốc (trừ error/success msg để tránh flash)
+        Array.from(container.children).forEach(child => {
+            if (child.id !== 'error-msg' && child.id !== 'success-msg') {
+                child.classList.remove('hidden');
+            }
+        });
         setLoading(false, 'Đăng ký & Tạo Khóa');
     });
 }
