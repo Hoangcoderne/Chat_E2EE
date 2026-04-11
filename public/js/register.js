@@ -229,51 +229,39 @@ async function doRegister() {
     }
 }
 
-// UI: Hiện trang recovery key (Phase 1 → Phase 2)
+// UI: Hiện trang recovery key — MÀN HÌNH HOÀN TOÀN RIÊNG BIỆT
 function showRecoveryStep(recoveryDisplay) {
-    // Ẩn TẤT CẢ nội dung gốc trong auth-container (h2, p, form, link p)
-    const container = form.parentNode;
-    Array.from(container.children).forEach(child => child.classList.add('hidden'));
+    // Thay thế toàn bộ body — tách hẳn khỏi trang đăng ký
+    document.body.innerHTML = `
+    <div class="auth-container" id="recovery-container">
+        <div class="recovery-panel">
+            <div class="recovery-panel-icon">🔑</div>
+            <h3 class="recovery-panel-title">Recovery Key của bạn</h3>
+            <p class="recovery-panel-desc">
+                Đây là lần <strong>DUY NHẤT</strong> key được hiển thị.<br>
+                Hãy lưu ở nơi an toàn — không thể khôi phục nếu mất.<br>
+                <span class="recovery-panel-warning">Tài khoản chưa được tạo cho đến khi bạn xác nhận bên dưới.</span>
+            </p>
 
-    const panel = document.createElement('div');
-    panel.id = 'recovery-panel';
-    panel.className = 'recovery-panel';
+            <div class="recovery-key-box">${recoveryDisplay}</div>
 
-    panel.innerHTML = `
-        <div class="recovery-panel-icon">🔑</div>
-        <h3 class="recovery-panel-title">Recovery Key của bạn</h3>
-        <p class="recovery-panel-desc">
-            Đây là lần <strong>DUY NHẤT</strong> key được hiển thị.<br>
-            Hãy lưu ở nơi an toàn — không thể khôi phục nếu mất.<br>
-            <span class="recovery-panel-warning">Tài khoản chưa được tạo cho đến khi bạn xác nhận bên dưới.</span>
-        </p>
+            <button id="btn-copy-recovery" class="btn-copy-recovery" type="button">📋 Sao chép Recovery Key</button>
 
-        <!-- Recovery key display -->
-        <div class="recovery-key-box">${recoveryDisplay}</div>
+            <div class="recovery-confirm-wrap">
+                <label class="recovery-confirm-label">
+                    <input type="checkbox" id="confirm-saved">
+                    <span>Tôi đã sao chép và lưu Recovery Key ở nơi an toàn. Tôi hiểu rằng nếu mất key này, tôi không thể khôi phục tài khoản.</span>
+                </label>
+            </div>
 
-        <!-- Nút copy -->
-        <button id="btn-copy-recovery" class="btn-copy-recovery" type="button">📋 Sao chép Recovery Key</button>
+            <div id="recovery-panel-error" class="recovery-panel-error"></div>
 
-        <!-- Checkbox xác nhận -->
-        <div class="recovery-confirm-wrap">
-            <label class="recovery-confirm-label">
-                <input type="checkbox" id="confirm-saved">
-                <span>Tôi đã sao chép và lưu Recovery Key ở nơi an toàn. Tôi hiểu rằng nếu mất key này, tôi không thể khôi phục tài khoản.</span>
-            </label>
+            <button id="btn-create-account" class="btn-create-account" disabled type="button">✅ Hoàn thành & Tạo tài khoản</button>
+
+            <button id="btn-back-to-form" class="btn-back-to-form" type="button">← Quay lại chỉnh sửa thông tin</button>
         </div>
-
-        <!-- Lỗi từ API (nếu có) -->
-        <div id="recovery-panel-error" class="recovery-panel-error"></div>
-
-        <!-- Nút tạo tài khoản — bị khoá cho đến khi tick checkbox -->
-        <button id="btn-create-account" class="btn-create-account" disabled type="button">✅ Hoàn thành & Tạo tài khoản</button>
-
-        <!-- Nút quay lại form -->
-        <button id="btn-back-to-form" class="btn-back-to-form" type="button">← Quay lại chỉnh sửa thông tin</button>
+    </div>
     `;
-
-    // Chèn panel cuối container — toàn bộ nội dung cũ đã hidden
-    container.appendChild(panel);
 
     // Event listeners
 
@@ -301,24 +289,18 @@ function showRecoveryStep(recoveryDisplay) {
     // Nút tạo tài khoản — gọi API
     document.getElementById('btn-create-account').addEventListener('click', doRegister);
 
-    // Nút quay lại — xoá panel, hiện lại tất cả nội dung gốc
+    // Nút quay lại — reload trang đăng ký
     document.getElementById('btn-back-to-form').addEventListener('click', () => {
-        panel.remove();
         pendingPayload = null;
-        Array.from(container.children).forEach(child => {
-            if (child.id !== 'error-msg' && child.id !== 'success-msg') {
-                child.classList.remove('hidden');
-            }
-        });
-        setLoading(false, 'Đăng ký & Tạo Khóa');
+        window.location.reload();
     });
 }
 
-// Sau khi API tạo tài khoản thành công
+// Sau khi API tạo tài khoản thành công — MÀN HÌNH THÀNH CÔNG RIÊNG BIỆT
 function showCreateSuccess() {
-    const panel = document.getElementById('recovery-panel');
-    if (panel) {
-        panel.innerHTML = `
+    document.body.innerHTML = `
+    <div class="auth-container" id="success-container">
+        <div class="recovery-panel success-state">
             <div class="recovery-success-icon">🎉</div>
             <h3 class="recovery-success-title">Tạo tài khoản thành công!</h3>
             <p class="recovery-success-desc">
@@ -326,12 +308,12 @@ function showCreateSuccess() {
                 Hãy đăng nhập để bắt đầu trò chuyện bảo mật.
             </p>
             <button id="btn-goto-login" class="btn-goto-login" type="button">Đăng nhập ngay →</button>
-        `;
-        panel.classList.add('success-state');
-        document.getElementById('btn-goto-login').addEventListener('click', () => {
-            window.location.href = '/login.html';
-        });
-    }
+        </div>
+    </div>
+    `;
+    document.getElementById('btn-goto-login').addEventListener('click', () => {
+        window.location.href = '/login.html';
+    });
 }
 
 // Helpers
