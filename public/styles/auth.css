@@ -75,7 +75,7 @@
     pointer-events: none;
 }
 
-.auth-container button {
+.auth-container button:not(.toggle-password) {
     width: 100%;
     padding: 10px;
     background: #0084ff;
@@ -87,7 +87,7 @@
     font-size: 15px;
 }
 
-.auth-container button:disabled { background: #ccc; cursor: not-allowed; }
+.auth-container button:not(.toggle-password):disabled { background: #ccc; cursor: not-allowed; }
 
 /* ── Color variants ── */
 .btn-green  { background: #28a745; }
