@@ -152,4 +152,10 @@ module.exports = function messageHandler(io, socket) {
         if (!socket.userId) return;
         socket.to(targetId).emit('you_have_been_unblocked', { unblockerId: socket.userId });
     });
+
+    //  notify_unfriend: thông báo cho đối phương khi bị hủy kết bạn 
+    socket.on('notify_unfriend', ({ targetId }) => {
+        if (!socket.userId) return;
+        socket.to(targetId).emit('you_have_been_unfriended', { unfrienderId: socket.userId });
+    });
 };

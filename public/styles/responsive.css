@@ -78,4 +78,9 @@
         padding: 6px;
         font-size: 14px;
     }
+
+    /* Mobile: luôn hiển thị nút ⋮ vì không có hover */
+    .contact-options-btn {
+        color: #999 !important;
+    }
 }

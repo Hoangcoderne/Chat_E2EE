@@ -221,6 +221,18 @@ export function registerDMSocketHandlers(socket) {
         }
     });
 
+    // Unfriend event: đối phương hủy kết bạn → xóa khỏi danh bạ
+    socket.on('you_have_been_unfriended', ({ unfrienderId }) => {
+        document.querySelector(`.contact-item[data-id="${unfrienderId}"]`)?.remove();
+        document.getElementById(`menu-${unfrienderId}`)?.remove();
+        if (state.currentChat.partnerId === unfrienderId) {
+            dom.chatHeader.classList.add('hidden');
+            dom.chatInputArea.classList.add('hidden');
+            dom.messagesList.innerHTML = '<div class="welcome-text">Người dùng này đã hủy kết bạn với bạn.</div>';
+            state.currentChat = {};
+        }
+    });
+
     // Generic events
     socket.on('system_message', ({ text }) => appendMessage(text, 'system'));
 

@@ -172,8 +172,8 @@ export function updateRequestUI() {
     state.friendRequests.forEach(req => {
         const li = document.createElement('li');
         li.className = 'req-item';
-        li.innerHTML = `<div style="flex:1">👋 <b>${req.fromUser}</b> mời kết bạn</div>
-            <button class="btn-accept small-btn" style="background:#28a745;margin-left:5px">✔</button>`;
+        li.innerHTML = `<div class="req-text">👋 <b>${req.fromUser}</b> mời kết bạn</div>
+            <button class="btn-accept small-btn">✔</button>`;
         li.querySelector('.btn-accept').addEventListener('click', () => {
             _socket?.emit('accept_friend_request', { requesterId: req.fromId });
             state.friendRequests = state.friendRequests.filter(r => r.fromId !== req.fromId);
@@ -185,9 +185,8 @@ export function updateRequestUI() {
     state.notifications.forEach(notif => {
         const li = document.createElement('li');
         li.className = 'notif-item';
-        li.style.cssText = 'border-left:3px solid #0084ff;background:#f0f8ff';
-        li.innerHTML = `<div style="flex:1;font-size:0.9em">${notif.content}</div>
-            <button class="btn-clear small-btn" style="background:#999;margin-left:5px">✕</button>`;
+        li.innerHTML = `<div class="notif-text">${notif.content}</div>
+            <button class="btn-clear small-btn">✕</button>`;
         li.querySelector('.btn-clear').addEventListener('click', () => {
             if (notif._id) _socket?.emit('clear_notification', { notifId: notif._id });
             state.notifications = state.notifications.filter(n => n._id !== notif._id);
@@ -223,11 +222,13 @@ export async function handleUnfriend(e, targetId) {
     if (!res) return;
     const data = await res.json();
     if (data.success) {
+        _socket?.emit('notify_unfriend', { targetId });
         document.querySelector(`.contact-item[data-id="${targetId}"]`)?.remove();
         document.getElementById(`menu-${targetId}`)?.remove();
         if (state.currentChat.partnerId === targetId) {
             dom.chatHeader.classList.add('hidden');
             dom.messagesList.innerHTML = '';
+            state.currentChat = {};
         }
     }
 }

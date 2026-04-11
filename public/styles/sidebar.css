@@ -133,8 +133,12 @@
 .requests-popup h4 { margin: 0 0 10px 0; font-size: 0.9em; color: #666; }
 .requests-popup ul { list-style: none; padding: 0; margin: 0; }
 .requests-popup li { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; }
-.btn-accept { background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+.btn-accept { background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-left: 5px; }
 .btn-accept:hover { background: #218838; }
+.req-text { flex: 1; }
+.notif-item { border-left: 3px solid #0084ff; background: #f0f8ff; }
+.notif-text { flex: 1; font-size: 0.9em; }
+.btn-clear { background: #999; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-left: 5px; }
 
 /* My Profile */
 .my-profile {
