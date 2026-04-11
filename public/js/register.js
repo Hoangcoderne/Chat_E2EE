@@ -124,7 +124,22 @@ form.addEventListener('submit', async (e) => {
         return;
     }
 
-    // Username sẽ được kiểm tra bởi API register (trả lỗi nếu đã tồn tại)
+    // Kiểm tra username đã tồn tại hay chưa — TRƯỚC khi tạo keys
+    setLoading(true, 'Đang kiểm tra tên đăng nhập...');
+    try {
+        const checkRes = await fetch(`/api/auth/check-username/${encodeURIComponent(username)}`);
+        const checkData = await checkRes.json();
+        if (checkData.exists) {
+            showError('Tên đăng nhập đã tồn tại! Vui lòng chọn tên khác.');
+            setLoading(false, 'Đăng ký & Tạo Khóa');
+            return;
+        }
+    } catch (_) {
+        showError('Không thể kiểm tra tên đăng nhập. Vui lòng thử lại.');
+        setLoading(false, 'Đăng ký & Tạo Khóa');
+        return;
+    }
+
     setLoading(true, 'Đang tạo khoá bảo mật...');
 
     try {

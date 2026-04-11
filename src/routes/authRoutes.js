@@ -9,6 +9,9 @@ const {
     resetPasswordValidation,
 } = require('../middleware/validators'); // Input validation
 
+// Kiểm tra username tồn tại — gọi trước khi sinh keys
+router.get('/check-username/:username', authController.checkUsername);
+
 // Đăng ký — validate input trước khi xử lý
 router.post('/register', registerValidation, authController.register);
 

@@ -7,6 +7,21 @@ const { hashToken, hashPassword, verifyPassword } = require('../utils/crypto');
 const { signAccessToken, issueRefreshToken, buildUserPayload } = require('../services/authService');
 
 
+// 0. KIỂM TRA USERNAME TỒN TẠI
+exports.checkUsername = async (req, res) => {
+    try {
+        const { username } = req.params;
+        if (!username || username.length < 3) {
+            return res.json({ exists: false });
+        }
+        const existing = await User.findOne({ username }, '_id').lean();
+        res.json({ exists: !!existing });
+    } catch (err) {
+        logger.error({ event: 'check_username_error', error: err.message });
+        res.status(500).json({ message: 'Lỗi server' });
+    }
+};
+
 // 1. ĐĂNG KÝ
 exports.register = async (req, res) => {
     try {

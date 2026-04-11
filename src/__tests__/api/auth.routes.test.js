@@ -7,6 +7,7 @@ process.env.NODE_ENV       = 'test';
 
 // Mock controller để test chỉ kiểm tra validation + routing
 jest.mock('../../controllers/authController', () => ({
+  checkUsername:     jest.fn((req, res) => res.json({ exists: false })),
   register:          jest.fn((req, res) => res.status(201).json({ message: 'ok' })),
   getSalt:           jest.fn((req, res) => res.json({ salt: 'saltVal==' })),
   login:             jest.fn((req, res) => res.json({ accessToken: 'fakeJWT', user: { userId: 'uid1', username: 'u', encryptedPrivateKey: 'enc=', iv: 'iv=', encryptedSigningPrivateKey: 'esig=', signingIv: 'siv=' } })),
