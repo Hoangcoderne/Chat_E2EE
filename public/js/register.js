@@ -232,78 +232,45 @@ async function doRegister() {
 // UI: Hiện trang recovery key (Phase 1 → Phase 2)
 function showRecoveryStep(recoveryDisplay) {
     // Ẩn form
-    form.style.display    = 'none';
-    btnSubmit.style.display = 'none';
-    successMsg.style.display = 'none';
-    errorMsg.style.display   = 'none';
+    form.classList.add('hidden');
+    successMsg.classList.add('hidden');
+    errorMsg.classList.add('hidden');
 
     const panel = document.createElement('div');
     panel.id = 'recovery-panel';
-    panel.style.cssText = `
-        background: #fffbe6;
-        border: 2px solid #f0a500;
-        border-radius: 8px;
-        padding: 20px;
-        margin: 10px 0;
-        text-align: center;
-    `;
+    panel.className = 'recovery-panel';
 
     panel.innerHTML = `
-        <div style="font-size:2em; margin-bottom:8px">🔑</div>
-        <h3 style="color:#b37400; margin:0 0 6px 0; font-size:1em">Recovery Key của bạn</h3>
-        <p style="font-size:0.82em; color:#555; margin-bottom:14px; line-height:1.6">
+        <div class="recovery-panel-icon">🔑</div>
+        <h3 class="recovery-panel-title">Recovery Key của bạn</h3>
+        <p class="recovery-panel-desc">
             Đây là lần <strong>DUY NHẤT</strong> key được hiển thị.<br>
             Hãy lưu ở nơi an toàn — không thể khôi phục nếu mất.<br>
-            <span style="color:#e03131; font-weight:600">Tài khoản chưa được tạo cho đến khi bạn xác nhận bên dưới.</span>
+            <span class="recovery-panel-warning">Tài khoản chưa được tạo cho đến khi bạn xác nhận bên dưới.</span>
         </p>
 
         <!-- Recovery key display -->
-        <div style="
-            font-family: monospace; font-size: 0.9em; font-weight: bold;
-            background: white; border: 1px solid #ddd; border-radius: 6px;
-            padding: 12px; letter-spacing: 1px; word-break: break-all;
-            color: #333; margin-bottom: 10px; text-align: left;
-        ">${recoveryDisplay}</div>
+        <div class="recovery-key-box">${recoveryDisplay}</div>
 
         <!-- Nút copy -->
-        <button id="btn-copy-recovery" style="
-            background: #f0a500; color: white; border: none;
-            padding: 7px 18px; border-radius: 4px; cursor: pointer;
-            font-size: 0.88em; margin-bottom: 18px;
-        ">📋 Sao chép Recovery Key</button>
+        <button id="btn-copy-recovery" class="btn-copy-recovery" type="button">📋 Sao chép Recovery Key</button>
 
         <!-- Checkbox xác nhận -->
-        <div style="margin-bottom: 16px;">
-            <label style="display:flex; align-items:flex-start; gap:8px; text-align:left; font-size:0.85em; cursor:pointer; line-height:1.5">
-                <div style="flex:2; display:flex; justify-content:center;">
-                    <input type="checkbox" id="confirm-saved">
-                </div>
-                <span style="flex:8">
-                    Tôi đã sao chép và lưu Recovery Key ở nơi an toàn. Tôi hiểu rằng nếu mất key này, tôi không thể khôi phục tài khoản.
-                </span>
+        <div class="recovery-confirm-wrap">
+            <label class="recovery-confirm-label">
+                <input type="checkbox" id="confirm-saved">
+                <span>Tôi đã sao chép và lưu Recovery Key ở nơi an toàn. Tôi hiểu rằng nếu mất key này, tôi không thể khôi phục tài khoản.</span>
             </label>
         </div>
 
         <!-- Lỗi từ API (nếu có) -->
-        <div id="recovery-panel-error" style="
-            display:none; color:#e03131; font-size:0.85em;
-            background:#fff0f0; border:1px solid #ffcccc;
-            border-radius:4px; padding:8px; margin-bottom:10px;
-        "></div>
+        <div id="recovery-panel-error" class="recovery-panel-error"></div>
 
         <!-- Nút tạo tài khoản — bị khoá cho đến khi tick checkbox -->
-        <button id="btn-create-account" disabled style="
-            width:100%; padding:11px; background:#ccc; color:white;
-            border:none; border-radius:4px; cursor:not-allowed;
-            font-weight:bold; font-size:0.95em; transition: background .2s;
-        ">✅ Hoàn thành & Tạo tài khoản</button>
+        <button id="btn-create-account" class="btn-create-account" disabled type="button">✅ Hoàn thành & Tạo tài khoản</button>
 
         <!-- Nút quay lại form -->
-        <button id="btn-back-to-form" style="
-            width:100%; padding:8px; background:none; color:#888;
-            border:1px solid #ddd; border-radius:4px; cursor:pointer;
-            font-size:0.85em; margin-top:8px;
-        ">← Quay lại chỉnh sửa thông tin</button>
+        <button id="btn-back-to-form" class="btn-back-to-form" type="button">← Quay lại chỉnh sửa thông tin</button>
     `;
 
     // Chèn panel vào container
@@ -314,7 +281,9 @@ function showRecoveryStep(recoveryDisplay) {
     // Copy
     document.getElementById('btn-copy-recovery').addEventListener('click', () => {
         navigator.clipboard.writeText(recoveryDisplay).then(() => {
-            document.getElementById('btn-copy-recovery').textContent = '✅ Đã sao chép';
+            const btn = document.getElementById('btn-copy-recovery');
+            btn.textContent = '✅ Đã sao chép';
+            btn.classList.add('copied');
         });
     });
 
@@ -323,12 +292,10 @@ function showRecoveryStep(recoveryDisplay) {
         const btn = document.getElementById('btn-create-account');
         if (e.target.checked) {
             btn.disabled = false;
-            btn.style.background = '#28a745';
-            btn.style.cursor     = 'pointer';
+            btn.classList.add('active');
         } else {
             btn.disabled = true;
-            btn.style.background = '#ccc';
-            btn.style.cursor     = 'not-allowed';
+            btn.classList.remove('active');
         }
     });
 
@@ -339,8 +306,7 @@ function showRecoveryStep(recoveryDisplay) {
     document.getElementById('btn-back-to-form').addEventListener('click', () => {
         panel.remove();
         pendingPayload = null;
-        form.style.display    = '';
-        btnSubmit.style.display = '';
+        form.classList.remove('hidden');
         setLoading(false, 'Đăng ký & Tạo Khóa');
     });
 }
@@ -350,20 +316,15 @@ function showCreateSuccess() {
     const panel = document.getElementById('recovery-panel');
     if (panel) {
         panel.innerHTML = `
-            <div style="font-size:2.5em; margin-bottom:12px">🎉</div>
-            <h3 style="color:#28a745; margin:0 0 8px 0">Tạo tài khoản thành công!</h3>
-            <p style="font-size:0.88em; color:#555; margin-bottom:20px; line-height:1.6">
+            <div class="recovery-success-icon">🎉</div>
+            <h3 class="recovery-success-title">Tạo tài khoản thành công!</h3>
+            <p class="recovery-success-desc">
                 Tài khoản của bạn đã được tạo.<br>
                 Hãy đăng nhập để bắt đầu trò chuyện bảo mật.
             </p>
-            <button id="btn-goto-login" style="
-                width:100%; padding:11px; background:#0084ff; color:white;
-                border:none; border-radius:4px; cursor:pointer;
-                font-weight:bold; font-size:0.95em;
-            ">Đăng nhập ngay →</button>
+            <button id="btn-goto-login" class="btn-goto-login" type="button">Đăng nhập ngay →</button>
         `;
-        panel.style.borderColor = '#22c55e';
-        panel.style.background  = '#f0fff4';
+        panel.classList.add('success-state');
         document.getElementById('btn-goto-login').addEventListener('click', () => {
             window.location.href = '/login.html';
         });
