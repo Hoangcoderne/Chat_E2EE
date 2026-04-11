@@ -48,13 +48,14 @@ module.exports = function friendHandler(io, socket) {
                 fromId:   socket.userId,
             });
 
-            // Lưu notification vào DB của người gửi
+            // Lưu notification vào DB của người gửi — lấy lại _id thật
             const notifContent = `Đã gửi lời mời tới ${targetUsername}`;
-            await User.findByIdAndUpdate(socket.userId, {
+            const updatedSender = await User.findByIdAndUpdate(socket.userId, {
                 $push: { notifications: { content: notifContent, type: 'friend_request_sent' } },
-            });
+            }, { new: true, select: 'notifications' });
+            const savedNotif = updatedSender.notifications[updatedSender.notifications.length - 1];
 
-            socket.emit('request_sent_success', notifContent);
+            socket.emit('request_sent_success', { _id: savedNotif._id, content: notifContent });
 
         } catch (err) {
             logger.error({ event: 'socket_error', handler: 'send_friend_request', error: err.message });
@@ -75,17 +76,18 @@ module.exports = function friendHandler(io, socket) {
             );
             if (!friendship) return;
 
-            // Lưu notification cho người gửi lời mời
+            // Lưu notification cho người gửi lời mời — lấy lại _id thật
             const notifContent = `${socket.username} đã chấp nhận lời mời kết bạn!`;
-            await User.findByIdAndUpdate(requesterId, {
+            const updatedRequester = await User.findByIdAndUpdate(requesterId, {
                 $push: { notifications: { content: notifContent, type: 'friend_accept' } },
-            });
+            }, { new: true, select: 'notifications' });
+            const savedNotif = updatedRequester.notifications[updatedRequester.notifications.length - 1];
 
-            // Thông báo cho người gửi lời mời
+            // Thông báo cho người gửi lời mời — gửi kèm _id thật
             socket.to(requesterId).emit('request_accepted', {
                 accepterId:   socket.userId,
                 accepterName: socket.username,
-                notification: { content: notifContent },
+                notification: { _id: savedNotif._id, content: notifContent },
             });
 
             // Kích hoạt handshake E2EE phía accepter
@@ -104,7 +106,7 @@ module.exports = function friendHandler(io, socket) {
     // clear_notification: xoá một notification cụ thể
     socket.on('clear_notification', async ({ notifId }) => {
         try {
-            if (!notifId || notifId.toString().startsWith('temp_')) return;
+            if (!notifId) return;
             await User.findByIdAndUpdate(socket.userId, {
                 $pull: { notifications: { _id: notifId } },
             });

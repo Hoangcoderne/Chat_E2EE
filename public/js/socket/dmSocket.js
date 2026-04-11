@@ -185,7 +185,7 @@ export function registerDMSocketHandlers(socket) {
 
     socket.on('request_accepted', (data) => {
         if (data.notification) {
-            data.notification._id = 'temp_' + Date.now();
+            // Server gửi kèm _id thật — dùng trực tiếp, không gán temp
             state.notifications.unshift(data.notification);
             updateRequestUI();
         }
@@ -199,8 +199,9 @@ export function registerDMSocketHandlers(socket) {
         if (item) { item.click(); item.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
     });
 
-    socket.on('request_sent_success', (msg) => {
-        state.notifications.unshift({ _id: 'temp_' + Date.now(), content: msg });
+    socket.on('request_sent_success', (notif) => {
+        // Server gửi { _id, content } — dùng trực tiếp
+        state.notifications.unshift(notif);
         updateRequestUI();
     });
 
