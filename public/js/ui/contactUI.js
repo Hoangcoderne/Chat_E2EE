@@ -172,26 +172,53 @@ export function updateRequestUI() {
     state.friendRequests.forEach(req => {
         const li = document.createElement('li');
         li.className = 'req-item';
-        li.innerHTML = `<div class="req-text">👋 <b>${req.fromUser}</b> mời kết bạn</div>
-            <button class="btn-accept small-btn">✔</button>`;
-        li.querySelector('.btn-accept').addEventListener('click', () => {
+
+        const textDiv = document.createElement('div');
+        textDiv.className = 'req-text';
+        // textContent an toàn — không parse HTML từ server
+        textDiv.textContent = `👋 ${req.fromUser} mời kết bạn`;
+        const bold = document.createElement('b');
+        // Re-render với <b> bằng cách tách text
+        textDiv.textContent = '';
+        textDiv.appendChild(document.createTextNode('👋 '));
+        bold.textContent = req.fromUser;
+        textDiv.appendChild(bold);
+        textDiv.appendChild(document.createTextNode(' mời kết bạn'));
+
+        const acceptBtn = document.createElement('button');
+        acceptBtn.className = 'btn-accept small-btn';
+        acceptBtn.textContent = '✔';
+        acceptBtn.addEventListener('click', () => {
             _socket?.emit('accept_friend_request', { requesterId: req.fromId });
             state.friendRequests = state.friendRequests.filter(r => r.fromId !== req.fromId);
             updateRequestUI();
         });
+
+        li.appendChild(textDiv);
+        li.appendChild(acceptBtn);
         dom.reqList.appendChild(li);
     });
 
     state.notifications.forEach(notif => {
         const li = document.createElement('li');
         li.className = 'notif-item';
-        li.innerHTML = `<div class="notif-text">${notif.content}</div>
-            <button class="btn-clear small-btn">✕</button>`;
-        li.querySelector('.btn-clear').addEventListener('click', () => {
+
+        const textDiv = document.createElement('div');
+        textDiv.className = 'notif-text';
+        // textContent an toàn — notif.content có thể chứa tên user lạ
+        textDiv.textContent = notif.content;
+
+        const clearBtn = document.createElement('button');
+        clearBtn.className = 'btn-clear small-btn';
+        clearBtn.textContent = '✕';
+        clearBtn.addEventListener('click', () => {
             if (notif._id) _socket?.emit('clear_notification', { notifId: notif._id });
             state.notifications = state.notifications.filter(n => n._id !== notif._id);
             updateRequestUI();
         });
+
+        li.appendChild(textDiv);
+        li.appendChild(clearBtn);
         dom.reqList.appendChild(li);
     });
 }

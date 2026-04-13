@@ -15,6 +15,19 @@ exports.getChatHistory = async (req, res) => {
         const limit = Math.min(parseInt(req.query.limit) || 50, 100);
         const before = req.query.before ? new Date(req.query.before) : null;
 
+        // Kiểm tra friendship — ngăn user probe history với bất kỳ userId lạ nào.
+        // Chấp nhận cả 'blocked' vì hai bên từng có quan hệ và cần xem lại lịch sử.
+        const friendship = await Friendship.findOne({
+            $or: [
+                { requester: currentUserId, recipient: partnerId },
+                { requester: partnerId,     recipient: currentUserId },
+            ],
+            status: { $in: ['accepted', 'blocked'] },
+        });
+        if (!friendship) {
+            return res.status(403).json({ message: 'Không có quyền xem lịch sử chat.' });
+        }
+
         const filter = {
             $or: [
                 { sender: currentUserId, recipient: partnerId },

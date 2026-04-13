@@ -5,28 +5,10 @@ const chatController = require('../controllers/chatController');
 const authMiddleware = require('../middleware/authMiddleware');
 const {
     targetIdValidation,
-    handleValidationErrors,
+    messageIdValidation,
+    reactionValidation,
+    partnerIdValidation,
 } = require('../middleware/validators');
-const { body, param } = require('express-validator');
-
-// Validation cho messageId
-const messageIdValidation = [
-    body('messageId').notEmpty().withMessage('Thiếu messageId').isMongoId().withMessage('messageId không hợp lệ'),
-    handleValidationErrors,
-];
-
-// Validation cho reaction
-const reactionValidation = [
-    body('messageId').notEmpty().withMessage('Thiếu messageId').isMongoId().withMessage('messageId không hợp lệ'),
-    body('emoji').notEmpty().withMessage('Thiếu emoji').isIn(['👍','❤️','😂','😮','😢','😡']).withMessage('Emoji không hợp lệ'),
-    handleValidationErrors,
-];
-
-// Validation cho partnerId param
-const partnerIdValidation = [
-    param('partnerId').isMongoId().withMessage('partnerId không hợp lệ'),
-    handleValidationErrors,
-];
 
 // ── Các route ──
 router.get('/history/:partnerId', authMiddleware, partnerIdValidation,  chatController.getChatHistory);
