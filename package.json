@@ -4,12 +4,15 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "jest --runInBand --forceExit",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --runInBand --forceExit",
     "test:unit": "jest --runInBand --forceExit --testPathPattern=unit",
     "test:integration": "jest --runInBand --forceExit --testPathPattern=integration",
     "test:api": "jest --runInBand --forceExit --testPathPattern=api",
     "test:coverage": "jest --runInBand --forceExit --coverage"
   },
+  "setupFiles": [
+    "./src/__tests__/helpers/browserGlobals.js"
+  ],
   "jest": {
     "testEnvironment": "node",
     "testTimeout": 30000,
@@ -19,7 +22,8 @@
     "collectCoverageFrom": [
       "src/controllers/**/*.js",
       "src/middleware/**/*.js",
-      "src/utils/**/*.js"
+      "src/utils/**/*.js",
+      "src/socket/**/*.js"
     ]
   },
   "dependencies": {
@@ -40,6 +44,7 @@
     "winston": "^3.19.0"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "jest": "^30.3.0",
     "mongodb-memory-server": "^10.1.4",
     "nodemon": "^3.1.11",
