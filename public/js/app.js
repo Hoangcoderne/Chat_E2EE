@@ -3,7 +3,7 @@
 
 import { state }    from './state.js';
 import { dom }      from './ui/dom.js';
-import { logout, loadKeyFromDB } from './utils.js';
+import { logout, loadKeyFromDB, tryRefreshToken, getAccessToken } from './utils.js';
 import { loadContacts, loadFriendRequests, loadNotifications, loadGroups } from './api.js';
 import { updateRequestUI, setSocket as setContactSocket } from './ui/contactUI.js';
 import { setSocket as setGroupSocket, openCreateGroupModal, submitCreateGroup, addSelectedMembers, loadManageModal } from './ui/groupUI.js';
@@ -12,11 +12,10 @@ import { registerDMSocketHandlers }    from './socket/dmSocket.js';
 import { registerGroupSocketHandlers } from './socket/groupSocket.js';
 import { cancelReply } from './ui/messageUI.js';
 
-// Khởi tạo Socket.io với JWT authentication
+// Socket khởi tạo KHÔNG tự kết nối — token chưa có ở thời điểm này.
+// initApp() sẽ gọi tryRefreshToken() trước, sau đó set socket.auth rồi connect.
 // eslint-disable-next-line no-undef
-const socket = io({
-    auth: { token: localStorage.getItem('accessToken') },
-});
+const socket = io({ autoConnect: false });
 
 // Inject socket vào các module cần dùng
 setContactSocket(socket);
@@ -29,14 +28,27 @@ registerGroupSocketHandlers(socket);
 
 // initApp — chạy một lần khi trang load
 async function initApp() {
-    const token    = localStorage.getItem('accessToken');
     const userId   = sessionStorage.getItem('userId');
     const username = sessionStorage.getItem('username');
 
-    if (!token || !userId || !username) {
+    // Kiểm tra session cơ bản trước khi gọi network
+    if (!userId || !username) {
         window.location.href = '/login.html';
         return;
     }
+
+    // Lấy access token mới vào memory qua HttpOnly refresh cookie.
+    // Không đọc localStorage — in-memory pattern.
+    // Nếu cookie đã hết hạn hoặc không hợp lệ → về login.
+    const refreshed = await tryRefreshToken();
+    if (!refreshed) {
+        window.location.href = '/login.html';
+        return;
+    }
+
+    // Kết nối socket với token vừa lấy được từ memory
+    socket.auth = { token: getAccessToken() };
+    socket.connect();
 
     try {
         const privateKey = await loadKeyFromDB('my-private-key');

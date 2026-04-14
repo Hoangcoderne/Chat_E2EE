@@ -4,12 +4,20 @@
 import { state } from './state.js';
 import { decryptMessage } from './crypto/key-manager.js';
 
+// In-memory token store
+// Token chỉ tồn tại trong module scope này.
+// Page refresh sẽ trigger tryRefreshToken() trong app.js để tái tạo
+// token từ HttpOnly refresh cookie — không cần đọc bất kỳ storage nào.
+let _accessToken = null;
+
+export function setAccessToken(token) { _accessToken = token; }
+export function getAccessToken()      { return _accessToken;  }
+export function clearAccessToken()    { _accessToken = null;  }
+
 // authFetch: tự động refresh token khi hết hạn
 export async function authFetch(url, options = {}, _isRetry = false) {
-    const token = localStorage.getItem('accessToken');
-
     if (!options.headers) options.headers = {};
-    options.headers['Authorization'] = `Bearer ${token}`;
+    options.headers['Authorization'] = `Bearer ${_accessToken}`;
     if (!options.headers['Content-Type']) {
         options.headers['Content-Type'] = 'application/json';
     }
@@ -23,7 +31,7 @@ export async function authFetch(url, options = {}, _isRetry = false) {
             const refreshed = await tryRefreshToken();
             if (refreshed) {
                 const retryOptions = { ...options, headers: { ...options.headers } };
-                retryOptions.headers['Authorization'] = `Bearer ${localStorage.getItem('accessToken')}`;
+                retryOptions.headers['Authorization'] = `Bearer ${_accessToken}`;
                 return fetch(url, retryOptions);
             }
         }
@@ -35,7 +43,7 @@ export async function authFetch(url, options = {}, _isRetry = false) {
     return res;
 }
 
-// tryRefreshToken: gọi /api/auth/refresh (cookie tự động gửi kèm)
+// tryRefreshToken: gọi /api/auth/refresh (HttpOnly cookie tự động gửi kèm)
 export async function tryRefreshToken() {
     try {
         const res = await fetch('/api/auth/refresh', {
@@ -44,7 +52,7 @@ export async function tryRefreshToken() {
         });
         if (!res.ok) return false;
         const data = await res.json();
-        localStorage.setItem('accessToken', data.accessToken);
+        _accessToken = data.accessToken; // ghi thẳng vào module variable
         return true;
     } catch (err) {
         console.error('Refresh failed:', err);
@@ -76,8 +84,9 @@ export async function logout() {
             };
         } catch (_) {}
 
+        _accessToken = null; // xóa khỏi memory
         sessionStorage.clear();
-        localStorage.removeItem('accessToken');
+        // localStorage.removeItem('accessToken') không cần — token không còn ở đó
         window.location.href = '/login.html';
     }
 }

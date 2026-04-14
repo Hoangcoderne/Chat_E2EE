@@ -46,12 +46,58 @@ beforeEach(() => { jest.clearAllMocks(); global.onlineUsers.clear(); });
 
 // ════════════════════════════════════════════════════════════════════════
 describe('chatController.getChatHistory()', () => {
+
+  // Helper: mock friendship hợp lệ (dùng cho các test không test friendship gate)
+  function mockValidFriendship(status = 'accepted') {
+    Friendship.findOne.mockResolvedValue({ status });
+  }
+
+  // ── Friendship gate (bảo vệ privacy) ─────────────────────────────────
+  test('SECURITY: không có friendship → 403, không query Message', async () => {
+    Friendship.findOne.mockResolvedValue(null);
+
+    const res = mkRes();
+    await chatController.getChatHistory(mkReq({}, { partnerId: 'uid_bob' }), res);
+
+    expect(res._status).toBe(403);
+    expect(res._body.message).toMatch(/quyền/);
+    // Không được phép xuống đến Message.find
+    expect(Message.find).not.toHaveBeenCalled();
+  });
+
+  test('SECURITY: friendship pending → 403 (chưa chấp nhận)', async () => {
+    // pending không nằm trong $in: ['accepted', 'blocked'] → findOne trả null
+    Friendship.findOne.mockResolvedValue(null);
+
+    const res = mkRes();
+    await chatController.getChatHistory(mkReq({}, { partnerId: 'uid_bob' }), res);
+
+    expect(res._status).toBe(403);
+    expect(Message.find).not.toHaveBeenCalled();
+  });
+
+  test('friendship blocked → vẫn cho xem history (hai bên từng có quan hệ)', async () => {
+    mockValidFriendship('blocked');
+    Message.find.mockReturnValue({
+      sort: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) })
+    });
+    Message.updateMany.mockResolvedValue({ modifiedCount: 0 });
+
+    const res = mkRes();
+    await chatController.getChatHistory(mkReq({}, { partnerId: 'uid_bob' }), res);
+
+    // Phải cho qua (200) vì blocked vẫn thuộc $in: ['accepted', 'blocked']
+    expect(res._status).toBeNull(); // 200 mặc định (không gọi .status() explicit)
+    expect(res._body).toHaveProperty('messages');
+  });
+
+  // ── Happy path ────────────────────────────────────────────────────────
   test('trả danh sách messages (paginated)', async () => {
+    mockValidFriendship();
     const msgs = [
       { ...fakeMsg({ sender: 'uid_alice', timestamp: new Date('2026-01-01') }) },
       { ...fakeMsg({ sender: 'uid_bob',   timestamp: new Date('2026-01-02') }) },
     ];
-    // Mongoose query chain: find().sort().limit()
     Message.find.mockReturnValue({
       sort: jest.fn().mockReturnValue({
         limit: jest.fn().mockResolvedValue(msgs)
@@ -67,6 +113,7 @@ describe('chatController.getChatHistory()', () => {
   });
 
   test('messages từ partner → gọi updateMany để mark read', async () => {
+    mockValidFriendship();
     Message.find.mockReturnValue({
       sort: jest.fn().mockReturnValue({
         limit: jest.fn().mockResolvedValue([])
@@ -83,6 +130,7 @@ describe('chatController.getChatHistory()', () => {
   });
 
   test('IDOR: chỉ query messages của đúng cặp user (dùng userId từ JWT)', async () => {
+    mockValidFriendship();
     Message.find.mockReturnValue({
       sort: jest.fn().mockReturnValue({
         limit: jest.fn().mockResolvedValue([])
@@ -95,11 +143,29 @@ describe('chatController.getChatHistory()', () => {
     // $or query phải chứa đúng uid_alice (từ JWT) và uid_bob (params)
     const queryArg = Message.find.mock.calls[0][0];
     const orClauses = queryArg.$or;
-    const hasAliceBob = orClauses.some(c => 
+    const hasAliceBob = orClauses.some(c =>
       (c.sender === 'uid_alice' && c.recipient === 'uid_bob') ||
       (c.sender === 'uid_bob'   && c.recipient === 'uid_alice')
     );
     expect(hasAliceBob).toBe(true);
+  });
+
+  test('Friendship.findOne được gọi với đúng cả hai chiều (requester/recipient)', async () => {
+    mockValidFriendship();
+    Message.find.mockReturnValue({
+      sort: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) })
+    });
+    Message.updateMany.mockResolvedValue({});
+
+    await chatController.getChatHistory(mkReq({}, { partnerId: 'uid_bob' }, 'uid_alice'), mkRes());
+
+    // Query phải dùng $or để check cả hai chiều requester/recipient
+    const callArg = Friendship.findOne.mock.calls[0][0];
+    expect(callArg).toHaveProperty('$or');
+    expect(callArg.$or).toHaveLength(2);
+    // Chấp nhận cả accepted và blocked
+    expect(callArg.status.$in).toContain('accepted');
+    expect(callArg.status.$in).toContain('blocked');
   });
 });
 

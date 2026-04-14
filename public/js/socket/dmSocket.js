@@ -3,7 +3,7 @@
 
 import { state }       from '../state.js';
 import { dom }         from '../ui/dom.js';
-import { authFetch, decryptReplyTo } from '../utils.js';
+import { authFetch, decryptReplyTo, getAccessToken } from '../utils.js';
 import {
     appendMessage, clearEmptyState,
     renderReactions, cancelReply,
@@ -27,9 +27,9 @@ import { notifyNewMessage, clearNotification } from '../ui/notificationUI.js';
 
 export function registerDMSocketHandlers(socket) {
 
-    // Kết nối lại sau ngắt mạng — cập nhật token mới nhất
+    // Kết nối lại sau ngắt mạng — cập nhật token mới nhất từ memory
     socket.on('connect', () => {
-        socket.auth = { token: localStorage.getItem('accessToken') };
+        socket.auth = { token: getAccessToken() };
 
         const userId = sessionStorage.getItem('userId');
         if (!userId) return;

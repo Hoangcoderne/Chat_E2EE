@@ -4,6 +4,7 @@ import {
     decryptAndImportPrivateKey,
     base64ToArrayBuffer
 } from './crypto/key-manager.js';
+import { setAccessToken } from './utils.js';
 
 const form = document.getElementById('login-form');
 const btnSubmit = document.getElementById('btn-submit');
@@ -77,10 +78,11 @@ form.addEventListener('submit', async (e) => {
         const data = await loginRes.json();
         if (!loginRes.ok) throw new Error(data.message || "Đăng nhập thất bại");
 
-        // BƯỚC 4: Lưu Access Token
-        // Chỉ lưu accessToken — refreshToken nằm trong HttpOnly Cookie do server set
-        console.log("Login OK! Saving Access Token...");
-        localStorage.setItem('accessToken', data.accessToken);
+        // BƯỚC 4: Lưu Access Token vào memory (không localStorage — in-memory pattern)
+        // Refresh cookie (HttpOnly) đã được server set; khi redirect sang /,
+        // app.js sẽ gọi tryRefreshToken() để lấy token mới vào memory.
+        console.log("Login OK! Saving Access Token to memory...");
+        setAccessToken(data.accessToken);
         sessionStorage.setItem('userId', data.user.userId);
         sessionStorage.setItem('username', data.user.username);
 

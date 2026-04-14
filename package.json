@@ -4,15 +4,12 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --runInBand --forceExit",
-    "test:unit": "jest --runInBand --forceExit --testPathPattern=unit",
-    "test:integration": "jest --runInBand --forceExit --testPathPattern=integration",
-    "test:api": "jest --runInBand --forceExit --testPathPattern=api",
-    "test:coverage": "jest --runInBand --forceExit --coverage"
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules SUPPRESS_JEST_WARNINGS=true jest --runInBand --forceExit",
+    "test:unit": "cross-env NODE_OPTIONS=--experimental-vm-modules SUPPRESS_JEST_WARNINGS=true jest --runInBand --forceExit --testPathPattern=unit",
+    "test:integration": "cross-env NODE_OPTIONS=--experimental-vm-modules SUPPRESS_JEST_WARNINGS=true jest --runInBand --forceExit --testPathPattern=integration",
+    "test:api": "cross-env NODE_OPTIONS=--experimental-vm-modules SUPPRESS_JEST_WARNINGS=true jest --runInBand --forceExit --testPathPattern=api",
+    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules SUPPRESS_JEST_WARNINGS=true jest --runInBand --forceExit --coverage"
   },
-  "setupFiles": [
-    "./src/__tests__/helpers/browserGlobals.js"
-  ],
   "jest": {
     "testEnvironment": "node",
     "testTimeout": 30000,
@@ -24,6 +21,9 @@
       "src/middleware/**/*.js",
       "src/utils/**/*.js",
       "src/socket/**/*.js"
+    ],
+    "setupFiles": [
+      "./src/__tests__/helpers/browserGlobals.js"
     ]
   },
   "dependencies": {
