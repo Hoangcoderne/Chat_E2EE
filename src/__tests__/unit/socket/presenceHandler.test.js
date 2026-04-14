@@ -2,15 +2,15 @@
 // Unit tests cho src/socket/presenceHandler.js
 // Dùng jest.mock để mock onlineUsers module, test tất cả event handlers.
 
-jest.mock('../../utils/onlineUsers');
-jest.mock('../../utils/logger', () => ({
+jest.mock('../../../utils/onlineUsers');
+jest.mock('../../../utils/logger', () => ({
     info:  jest.fn(),
     warn:  jest.fn(),
     error: jest.fn(),
 }));
 
-const presenceHandler = require('../../socket/presenceHandler');
-const onlineUsers     = require('../../utils/onlineUsers');
+const presenceHandler = require('../../../socket/presenceHandler');
+const onlineUsers     = require('../../../utils/onlineUsers');
 
 // ── Mock factory helpers ──────────────────────────────────────────────────
 

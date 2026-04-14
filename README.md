@@ -2,7 +2,7 @@
 
 ![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-6.0+-47A248?logo=mongodb&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-210%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-213%20passed-brightgreen)
 ![Security](https://img.shields.io/badge/E2EE-Zero--Knowledge-blueviolet)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
@@ -75,6 +75,8 @@
 - **Refresh Token** — Long-lived (24h), stored in an **HttpOnly cookie** (not accessible by JavaScript) to prevent XSS theft
 - **Session Revocation** — All active sessions are invalidated immediately upon password reset
 - **Automatic Token Refresh** — `authFetch()` intercepts 401 responses, silently refreshes the token, and retries the original request without interrupting the user
+- **In-Memory Access Token** — Access token is stored exclusively in JavaScript module scope (never `localStorage`), eliminating XSS-based token theft while still surviving silent refresh via the HttpOnly cookie
+- **Chat History Privacy Gate** — `GET /api/chat/history/:partnerId` requires a verified friendship record (`accepted` or `blocked`) before returning any messages, preventing users from probing message existence with arbitrary userIds
 
 ### Social Features
 - **Friend Management** — Send, accept, and cancel friend requests with real-time Socket.io notifications
@@ -257,9 +259,9 @@ Socket.io connections are rate-limited (10 per IP per 30s) and all event payload
 
 | Property | Access Token | Refresh Token |
 |---|---|---|
-| Storage | `localStorage` | **HttpOnly Cookie** |
+| Storage | **In-memory** (JS module scope) | **HttpOnly Cookie** |
 | Lifetime | 15 minutes | 24 hours |
-| JS readable | Yes | **No** (XSS-safe) |
+| JS readable | Yes (but not persistent across page load) | **No** (XSS-safe) |
 | Stored in DB | No | Yes (SHA-256 hash only) |
 | Revocable | No (short TTL) | Yes (`revoked` flag) |
 | Rotation | — | ✅ New token on each refresh |
@@ -397,7 +399,7 @@ CHAT_E2EE/
 │   │       ├── index.js                  # Re-exports all validators
 │   │       ├── common.js                 # Shared: validateUsername, validateRecoveryKey
 │   │       ├── authValidators.js         # loginValidation, registerValidation, resetValidation
-│   │       ├── chatValidators.js         # targetIdValidation
+│   │       ├── chatValidators.js         # targetIdValidation, messageIdValidation, reactionValidation, partnerIdValidation
 │   │       └── groupValidators.js        # createGroup, addMember, removeMember validators
 │   │
 │   ├── utils/
@@ -410,10 +412,16 @@ CHAT_E2EE/
 │       ├── unit/
 │       │   ├── crypto.test.js            # 23 tests — hashToken, bcrypt, generateRefreshToken
 │       │   ├── authMiddleware.test.js     # 9 tests — JWT valid/expired/invalid/missing
-│       │   └── validators.test.js        # 26 tests — all validation rules end-to-end
+│       │   ├── validators.test.js        # 26 tests — all validation rules end-to-end
+│       │   ├── keyManager.test.js        # 36 tests — all Web Crypto API
+│       │   └── socket/
+|       |       ├── presenceHandler.test.js  # 15 tests — join_user, disconnect, typing indicators
+|       |       ├── messageHandler.test.js   # 22 tests — send_message, mark_read, broadcast events
+|       |       ├── friendHandler.test.js    # 13 tests — friend requests, accept, notification clear
+|       |       └── groupHandler.test.js     # 26 tests — join_groups membership filter, send_group_message, reactions
 │       ├── integration/
 │       │   ├── authController.test.js     # 28 tests — register, login, refresh rotation, recovery
-│       │   ├── chatController.test.js     # 24 tests — paginated history, contacts, IDOR, reactions
+│       │   ├── chatController.test.js     # 28 tests — paginated history, contacts, friendship gate, IDOR, reactions
 │       │   └── groupController.test.js    # 29 tests — createGroup, member ops, reactions, seen
 │       ├── api/
 │       │   ├── auth.routes.test.js       # 29 tests — full pipeline: route → validator → controller
@@ -421,7 +429,8 @@ CHAT_E2EE/
 │       │   └── group.routes.test.js      # 23 tests — routing + auth guard on all endpoints
 │       └── helpers/
 │           ├── db.js                     # Test DB helper (stub)
-│           └── fixtures.js               # Factory functions for fake users, tokens, groups
+|           ├── fixtures.js               # Factory functions for fake users, tokens, groups        
+│           └── browserGlobals.js         # Polyfills window.crypto / btoa / atob for Node.js test env
 │
 └── public/                               # Frontend (Vanilla JS ES Modules)
     ├── index.html
@@ -470,7 +479,7 @@ CHAT_E2EE/
 ### Steps
 ```bash
 # 1. Clone the repository
-git clone <repo-url>
+git clone https://github.com/Hoangcoderne/Chat_E2EE.git
 cd chat_e2ee
 
 # 2. Install dependencies
@@ -569,7 +578,7 @@ LOG_LEVEL=info
 
 ## Running Tests
 
-The test suite covers **210 tests across 9 suites** on 3 levels: Unit, Integration, and API.
+The test suite covers **325 tests across 14 suites** on 3 levels: Unit, Integration, and API.
 
 ```bash
 # Run all tests
@@ -589,9 +598,11 @@ npm run test:coverage
 | Level | Suites | Tests | What is covered |
 |---|---|---|---|
 | Unit | 3 | 58 | `crypto.js` helpers, JWT middleware branches, all validator rules |
-| Integration | 3 | 81 | Controller logic + IDOR protection + security invariants (via jest.mock) |
+| Unit — Socket | 4 | 76 | presenceHandler, messageHandler, friendHandler, groupHandler |
+| Unit — Crypto | 1 | 36 | All Web Crypto API operations in `key-manager.js` |
+| Integration | 3 | 84 | Controller logic + IDOR + friendship gate + security invariants |
 | API | 3 | 71 | Full request pipeline: route → validator → authMiddleware → controller |
-| **Total** | **9** | **210** | |
+| **Total** | **14** | **325** | |
 
 Key security assertions verified by tests:
 - `authKeyHash` and `recoveryKeyHash` are always bcrypt-hashed before saving (never stored as plaintext)

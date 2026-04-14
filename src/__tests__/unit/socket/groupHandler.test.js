@@ -1,18 +1,18 @@
 // src/__tests__/unit/socket/groupHandler.test.js
 // Unit tests cho src/socket/groupHandler.js
 
-jest.mock('../../models/Group');
-jest.mock('../../models/GroupMessage');
-jest.mock('../../utils/logger', () => ({
+jest.mock('../../../models/Group');
+jest.mock('../../../models/GroupMessage');
+jest.mock('../../../utils/logger', () => ({
     info:  jest.fn(),
     warn:  jest.fn(),
     error: jest.fn(),
 }));
 
 const mongoose      = require('mongoose');
-const Group         = require('../../models/Group');
-const GroupMessage  = require('../../models/GroupMessage');
-const groupHandler  = require('../../socket/groupHandler');
+const Group         = require('../../../models/Group');
+const GroupMessage  = require('../../../models/GroupMessage');
+const groupHandler  = require('../../../socket/groupHandler');
 
 // ── Mock factories ────────────────────────────────────────────────────────
 

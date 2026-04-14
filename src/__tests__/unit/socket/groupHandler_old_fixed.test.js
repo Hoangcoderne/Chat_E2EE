@@ -11,13 +11,13 @@
 
 process.env.SESSION_SECRET = 'group_handler_test_secret_2026';
 
-jest.mock('../../models/Group');
-jest.mock('../../models/GroupMessage');
-jest.mock('../../models/User');
-jest.mock('../../utils/logger', () => ({
+jest.mock('../../../models/Group');
+jest.mock('../../../models/GroupMessage');
+jest.mock('../../../models/User');
+jest.mock('../../../utils/logger', () => ({
     info: jest.fn(), warn: jest.fn(), error: jest.fn(),
 }));
-jest.mock('../../utils/socketValidator', () => ({
+jest.mock('../../../utils/socketValidator', () => ({
     validateSocketPayload: jest.fn().mockReturnValue({ valid: true }),
     SCHEMAS: {
         send_group_message: {},
@@ -27,11 +27,11 @@ jest.mock('../../utils/socketValidator', () => ({
 }));
 
 const mongoose       = require('mongoose');
-const Group          = require('../../models/Group');
-const GroupMessage   = require('../../models/GroupMessage');
-const User           = require('../../models/User');
-const { validateSocketPayload } = require('../../utils/socketValidator');
-const groupHandler   = require('../../socket/groupHandler');
+const Group          = require('../../../models/Group');
+const GroupMessage   = require('../../../models/GroupMessage');
+const User           = require('../../../models/User');
+const { validateSocketPayload } = require('../../../utils/socketValidator');
+const groupHandler   = require('../../../socket/groupHandler');
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

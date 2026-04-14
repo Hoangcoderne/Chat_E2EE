@@ -1,17 +1,17 @@
 // src/__tests__/unit/socket/friendHandler.test.js
 // Unit tests cho src/socket/friendHandler.js
 
-jest.mock('../../models/User');
-jest.mock('../../models/Friendship');
-jest.mock('../../utils/logger', () => ({
+jest.mock('../../../models/User');
+jest.mock('../../../models/Friendship');
+jest.mock('../../../utils/logger', () => ({
     info:  jest.fn(),
     warn:  jest.fn(),
     error: jest.fn(),
 }));
 
-const User          = require('../../models/User');
-const Friendship    = require('../../models/Friendship');
-const friendHandler = require('../../socket/friendHandler');
+const User          = require('../../../models/User');
+const Friendship    = require('../../../models/Friendship');
+const friendHandler = require('../../../socket/friendHandler');
 
 // ── Mock factories ────────────────────────────────────────────────────────
 

@@ -5,20 +5,20 @@
 
 process.env.SESSION_SECRET = 'test_secret';
 
-jest.mock('../../models/Message');
-jest.mock('../../models/User');
-jest.mock('../../models/Friendship');
-jest.mock('../../utils/logger', () => ({
+jest.mock('../../../models/Message');
+jest.mock('../../../models/User');
+jest.mock('../../../models/Friendship');
+jest.mock('../../../utils/logger', () => ({
     info:  jest.fn(),
     warn:  jest.fn(),
     error: jest.fn(),
 }));
 
 const mongoose       = require('mongoose');
-const Message        = require('../../models/Message');
-const User           = require('../../models/User');
-const Friendship     = require('../../models/Friendship');
-const messageHandler = require('../../socket/messageHandler');
+const Message        = require('../../../models/Message');
+const User           = require('../../../models/User');
+const Friendship     = require('../../../models/Friendship');
+const messageHandler = require('../../../socket/messageHandler');
 
 // ── Mock factories ────────────────────────────────────────────────────────
 
